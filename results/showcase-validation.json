@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-20",
+  "scene": "Neighborhood street loop; side-view camera; target speed 0.1 m/s",
+  "aircraft_controller": "PX4 SITL system ID 2; normal offboard arming checks",
+  "onboard_processing": "i.MX95 hardware video decode, NPU YOLOv4 Tiny detection, ByteTrack ROS tracking",
+  "hover_recording_wall_seconds": 35,
+  "exported_video_wall_seconds": 30,
+  "hover_height_m": 4.5,
+  "maximum_hover_drift_m": 0.04077281670378841,
+  "tracking_messages_with_car": 473,
+  "tracking_messages_total": 473,
+  "same_car_identity_throughout": true,
+  "exported_frame_track_coverage_percent": 100,
+  "measured_source_fps": 15.866666666666667,
+  "export_presentation_fps": 30,
+  "export_size": [1280, 720],
+  "normal_landing_and_disarm": "passed",
+  "real_m7_remained_disarmed": true,
+  "sustained_following_30_seconds": "not passed; best separate following attempt lasted 12.006 wall seconds before target loss and safe hold",
+  "overlay_note": "Offline ROS boxes aligned with measured source-frame matches; presentation resamples real-time footage"
+}

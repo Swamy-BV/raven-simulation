@@ -22,7 +22,11 @@ from std_srvs.srv import SetBool, Trigger
 
 
 class FlightSession:
-    def __init__(self):
+    def __init__(self, hover_yaw_rad=math.pi / 2, record_unselected=False):
+        if not math.isfinite(hover_yaw_rad):
+            raise ValueError("Hover yaw must be finite")
+        self.hover_yaw_rad = hover_yaw_rad
+        self.record_unselected = record_unselected
         self.output_dir = Path("/tmp/raven-simulation-results") / time.strftime(
             "%Y%m%dT%H%M%SZ", time.gmtime()
         )
@@ -162,9 +166,16 @@ class FlightSession:
         self.tracks = m
         self.log_observations("tracks", m)
         if (
-            not self.selected
-            or self.health.get("state") not in ["following", "waiting", "holding"]
-            or time.monotonic() - self.snapshot_time < 0.05
+            (not self.selected and not self.record_unselected)
+            or self.position is None
+            or self.health.get("state")
+            not in (
+                ["idle", "following", "waiting", "holding"]
+                if self.record_unselected
+                else ["following", "waiting", "holding"]
+            )
+            or time.monotonic() - self.snapshot_time
+            < (0.2 if self.record_unselected else 0.05)
         ):
             return
         key = m.header.stamp.sec * 1000000000 + m.header.stamp.nanosec
@@ -276,7 +287,7 @@ class FlightSession:
         s.velocity = [math.nan] * 3
         s.acceleration = [math.nan] * 3
         s.jerk = [math.nan] * 3
-        s.yaw = 1.5707963267948966
+        s.yaw = self.hover_yaw_rad
         s.yawspeed = math.nan
         self.setpoint.publish(s)
         self.count += 1
@@ -362,7 +373,9 @@ class FlightSession:
         self.settled = time.monotonic()
         return False
 
-    def run_follow(self):
+    def run_follow(self, duration_sim_seconds=25.0):
+        if not 25 <= duration_sim_seconds <= 60:
+            raise ValueError("Following duration must be 25..60 simulated seconds")
         self.wait(
             lambda: self.status
             and self.m7
@@ -449,8 +462,9 @@ class FlightSession:
         origin = [self.position.x, self.position.y, self.position.z]
         last = 0
         while (
-            self.node.get_clock().now().nanoseconds - start_sim < 25000000000
-            and time.monotonic() - start < 120
+            self.node.get_clock().now().nanoseconds - start_sim
+            < duration_sim_seconds * 1e9
+            and time.monotonic() - start < 180
         ):
             rclpy.spin_once(self.node, timeout_sec=0.05)
             assert (
@@ -533,10 +547,14 @@ class FlightSession:
             s["following"].get("state") == "following" for s in self.samples
         ) / len(self.samples)
         assert (
-            duration_sim >= 25 and displacement > 1 and following_fraction > 0.9
+            duration_sim >= duration_sim_seconds
+            and displacement > 1
+            and following_fraction > 0.9
         ), "insufficient sustained closed-loop following"
 
-    def run_hover(self):
+    def run_hover(self, duration_wall_seconds=5.0, start_sim_seconds=0.0):
+        if not 5 <= duration_wall_seconds <= 60 or not 0 <= start_sim_seconds <= 300:
+            raise ValueError("Invalid hover recording duration or start time")
         self.wait(
             lambda: self.status
             and self.m7
@@ -568,9 +586,28 @@ class FlightSession:
         )
         self.command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, [1, 0])
         self.wait(self.hover_ready, 40, "stable 4.5 m hover")
-        until = time.monotonic() + 5
+        if start_sim_seconds:
+            self.wait(
+                lambda: self.node.get_clock().now().nanoseconds
+                >= start_sim_seconds * 1e9,
+                180,
+                "hover recording start time",
+            )
+        self.capture_start_sim_ns = self.node.get_clock().now().nanoseconds
+        self.capture_origin = [self.position.x, self.position.y, self.position.z]
+        self.hover_positions = []
+        until = time.monotonic() + duration_wall_seconds
         while time.monotonic() < until:
             rclpy.spin_once(self.node, timeout_sec=0.05)
+            assert not self.m7_armed, "Unexpected M7 arming"
+            assert (
+                self.status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD
+                and not self.status.failsafe
+            ), "Unexpected hover flight-mode loss"
+            self.hover_positions.append(
+                [self.position.x, self.position.y, self.position.z]
+            )
+        self.capture_end_sim_ns = self.node.get_clock().now().nanoseconds
         self.stream = False
         self.command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.wait(
