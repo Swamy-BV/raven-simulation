@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-20",
+  "meta_raven_commit": "634f20ed9944010b9b687bcbbabc34aad1ac40ff",
+  "simulation_implementation_commit": "7b49e7fc3d59203f90a2ae4c69b0d8cb2ecee0b9",
+  "px4_commit": "fffec82b2f970e5fec94174d5e1289c55a4ac52f",
+  "scenario": "street-follow.jsonc",
+  "target_speed_mps": 0.1,
+  "normal_following": {
+    "selected_id": "982db8a-9750f627:3:6:1",
+    "following_seconds": 40.19983124200371,
+    "following_sim_seconds": 25.008,
+    "horizontal_displacement_m": 1.263121069220242,
+    "hold_drift_m": 0.07531260937461658,
+    "real_m7_remained_disarmed": true,
+    "final_sim_arming_state": 1,
+    "passed_existing_25_sim_second_gate": true,
+    "observed_following_fraction": 1.0
+  },
+  "camera_interruption": {
+    "selected_id": "52441e18-21eeebcd:1:7:1",
+    "following_seconds": 9.002063161999104,
+    "following_sim_seconds": 5.12,
+    "horizontal_displacement_m": 1.3873749704992542,
+    "hold_drift_m": 0.07169514160744829,
+    "real_m7_remained_disarmed": true,
+    "final_sim_arming_state": 1,
+    "test_passed": true,
+    "sustained_following_pass": false,
+    "expected_failure": "capture stopped; selected identity expired and latched hold"
+  },
+  "stale_input": {
+    "injected_age_sim_seconds": 5,
+    "frames_published": 28,
+    "detection_messages": 0,
+    "stale_rejection_observed": true,
+    "both_vehicles_remained_disarmed": true
+  },
+  "timing": {
+    "clock_policy": "source age uses ROS time; same-board stage durations use steady wall time",
+    "source_age_sim_ms": {
+      "capture": {
+        "count": 1585,
+        "p50_ms": 1e-06,
+        "p95_ms": 16.000001,
+        "max_ms": 40.000001,
+        "min_ms": -79.999999
+      },
+      "inference": {
+        "count": 1331,
+        "p50_ms": 48.000001,
+        "p95_ms": 84.000001,
+        "max_ms": 224.000001,
+        "min_ms": 1e-06
+      },
+      "tracking": {
+        "count": 1330,
+        "p50_ms": 48.000001,
+        "p95_ms": 88.000001,
+        "max_ms": 224.000001,
+        "min_ms": 1e-06
+      },
+      "setpoint": {
+        "count": 91,
+        "p50_ms": 52.000001,
+        "p95_ms": 96.000001,
+        "max_ms": 112.000001,
+        "min_ms": 16.000001
+      }
+    },
+    "board_stage_wall_ms": {
+      "capture_to_inference": {
+        "count": 1331,
+        "p50_ms": 75.535783,
+        "p95_ms": 96.023503,
+        "max_ms": 365.951064,
+        "min_ms": 55.210014
+      },
+      "inference_to_tracking": {
+        "count": 1330,
+        "p50_ms": 1.101155,
+        "p95_ms": 1.562649,
+        "max_ms": 5.225812,
+        "min_ms": 0.561952
+      },
+      "tracking_to_setpoint": {
+        "count": 91,
+        "p50_ms": 15.738174,
+        "p95_ms": 16.3315,
+        "max_ms": 16.534707,
+        "min_ms": 11.933546
+      },
+      "capture_to_setpoint": {
+        "count": 91,
+        "p50_ms": 92.537468,
+        "p95_ms": 112.676551,
+        "max_ms": 122.976708,
+        "min_ms": 72.12751
+      }
+    },
+    "moving_command_age_sim_ms": {
+      "count": 142,
+      "p50_ms": 56.000001,
+      "p95_ms": 108.000001,
+      "max_ms": 232.000001,
+      "min_ms": 16.000001
+    },
+    "unique_source_frames": 1585,
+    "nonmonotonic_source_observations": 0,
+    "matched_frame_counts": {
+      "capture_to_inference": 1331,
+      "inference_to_tracking": 1330,
+      "tracking_to_setpoint": 91,
+      "capture_to_setpoint": 91
+    },
+    "sender": {
+      "sdk_receive_to_encoded_wall_ms": {
+        "count": 6312,
+        "p50_ms": 2.719465,
+        "p95_ms": 3.057241,
+        "max_ms": 12.942821,
+        "min_ms": 2.28592
+      },
+      "received_frames": 6312,
+      "encoded_frames": 6312,
+      "source_wall_fps": 17.413662132882834,
+      "max_appsrc_queued_bytes": 691200,
+      "cross_host_wall_latency": "not inferred from unsynchronized host steady clocks"
+    }
+  },
+  "acceptance": {
+    "moving_command_source_age_limit_sim_ms": 350,
+    "all_traced_moving_commands_within_limit": true,
+    "negative_stage_durations": 0
+  },
+  "hardware": {
+    "capture_decoder": "Wave6 V4L2 decoder device observed",
+    "inference": "Neutron worker with /dev/neutron0, delegate and compiled YOLOv4 Tiny model observed"
+  },
+  "checks": {
+    "yocto_affected_recipes": "all 6698 tasks succeeded, 6622 cached; format/tidy/IWYU and package QA enabled",
+    "offline_scenario_checks": 3,
+    "offline_flight_tests": "3 skipped without explicit opt-in; board runs recorded separately"
+  },
+  "deployment": {
+    "test_binaries": "temporary /run staging",
+    "root_filesystem": "read-only",
+    "original_capture_inference_tracking_services_restored": true,
+    "target_follower_stopped": true,
+    "full_swu_image_rebuilt": false
+  },
+  "limits": [
+    "This is a low-speed simulation test; not a one-minute high-speed or multi-car pursuit pass.",
+    "Normal-following and final trace/fault runs are separate sessions; trace publication placement changed between them without changing the control law.",
+    "The initial late-start camera-loss attempt timed out before target selection and landed; the fresh-scene repeat passed.",
+    "SDK-to-encoder and board stage durations use each machine steady clock; cross-host wall latency is not inferred.",
+    "Capture source age reached -80 ms while asynchronous ROS clock delivery caught up; future inputs were rejected, not restamped. Traced moving commands had positive source age.",
+    "A capture-to-inference wall-time outlier reached 366 ms across the full trace; percentile results do not establish a hard real-time guarantee.",
+    "Sender frame counts include time after capture was intentionally stopped; they do not measure network packet loss.",
+    "Physical aircraft flight, physical-camera exposure-to-command latency and viewpoint-change robustness remain unvalidated."
+  ]
+}
