@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "scenario.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <fstream>
 #include <json.hpp>
+#include <set>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace raven::simulation {
@@ -72,19 +75,101 @@ std::vector<Point> Route(const Json& route) {
   return points;
 }
 
+std::vector<Json> ActorProfiles(const Json& settings) {
+  std::vector<Json> profiles{settings};
+  const auto traffic = settings.value("traffic", Json::array());
+  if (!traffic.is_array() || traffic.size() > 7) {
+    throw std::runtime_error("Traffic must contain at most seven vehicles");
+  }
+  for (const auto& actor : traffic) {
+    auto profile = settings;
+    auto target = settings.at("target");
+    target.update(actor);
+    profile["target"] = target;
+    profile["target_speed_mps"] =
+        actor.value("speed_mps", settings.at("target_speed_mps").get<double>());
+    profile["phase_fraction"] = actor.value("phase_fraction", 0.0);
+    profile["reverse"] = actor.value("reverse", false);
+    profile["route_offset_xy_m"] =
+        actor.value("route_offset_xy_m", Point{0, 0});
+    profiles.push_back(std::move(profile));
+  }
+  return profiles;
+}
+
+std::vector<double> Speeds(const std::vector<Point>& points,
+                           const Json& profile, const double speed) {
+  std::vector<double> result(points.size(), speed);
+  if (!profile.contains("vehicle_acceleration_mps2")) return result;
+  const auto acceleration =
+      profile.at("vehicle_acceleration_mps2").get<double>();
+  const auto lateral =
+      profile.at("vehicle_lateral_acceleration_mps2").get<double>();
+  if (!std::isfinite(acceleration) || acceleration <= 0 || acceleration > 10 ||
+      !std::isfinite(lateral) || lateral <= 0 || lateral > 10) {
+    throw std::runtime_error("Invalid vehicle acceleration limits");
+  }
+  for (std::size_t i = 1; i + 1 < points.size(); ++i) {
+    const double ax = points[i][0] - points[i - 1][0];
+    const double ay = points[i][1] - points[i - 1][1];
+    const double bx = points[i + 1][0] - points[i][0];
+    const double by = points[i + 1][1] - points[i][1];
+    const auto angle =
+        std::abs(std::atan2(ax * by - ay * bx, ax * bx + ay * by));
+    const auto curvature =
+        angle / ((std::hypot(ax, ay) + std::hypot(bx, by)) / 2);
+    if (curvature > 1e-6)
+      result[i] = std::min(speed, std::sqrt(lateral / curvature));
+  }
+  result.front() = 0;
+  result.back() = 0;
+  for (std::size_t i = 1; i < points.size(); ++i) {
+    const auto distance = std::hypot(points[i][0] - points[i - 1][0],
+                                     points[i][1] - points[i - 1][1]);
+    result[i] = std::min(result[i], std::sqrt(result[i - 1] * result[i - 1] +
+                                              2 * acceleration * distance));
+  }
+  for (std::size_t i = points.size() - 1; i > 0; --i) {
+    const auto distance = std::hypot(points[i][0] - points[i - 1][0],
+                                     points[i][1] - points[i - 1][1]);
+    result[i - 1] = std::min(
+        result[i - 1],
+        std::sqrt(result[i] * result[i] + 2 * acceleration * distance));
+  }
+  return result;
+}
+
 Json Trajectory(const Json& profile) {
   const double speed = profile.at("target_speed_mps").get<double>();
   const double delay = profile.at("target_start_delay_s").get<double>();
   const double height = profile.at("target").at("height_ned_m").get<double>();
-  if (!std::isfinite(speed) || speed <= 0 || speed > 10 ||
+  if (!std::isfinite(speed) || speed <= 0 || speed > 30 ||
       !std::isfinite(delay) || delay <= 0 || delay > 300 ||
       !std::isfinite(height)) {
     throw std::runtime_error("Invalid target speed, start delay or height");
   }
-  const auto points = Route(profile.at("route"));
+  auto points = Route(profile.at("route"));
+  const auto phase = profile.value("phase_fraction", 0.0);
+  const auto offset = profile.value("route_offset_xy_m", Point{0, 0});
+  if (!std::isfinite(phase) || phase < 0 || phase >= 1 ||
+      !std::isfinite(offset[0]) || !std::isfinite(offset[1])) {
+    throw std::runtime_error("Invalid traffic phase or lane offset");
+  }
+  points.pop_back();
+  if (profile.value("reverse", false))
+    std::reverse(points.begin(), points.end());
+  const auto phase_index = static_cast<std::size_t>(phase * points.size());
+  std::rotate(points.begin(), points.begin() + phase_index, points.end());
+  for (auto& point : points) {
+    point[0] += offset[0];
+    point[1] += offset[1];
+  }
+  points.push_back(points.front());
+  const auto speeds = Speeds(points, profile, speed);
   Json t = {{"name", profile.at("scene_id")}};
   double elapsed = delay;
-  double heading = kPi / 2;
+  double heading =
+      std::atan2(points[1][1] - points[0][1], points[1][0] - points[0][0]);
   const auto append = [&](const double time, const Point& point,
                           const double yaw, const double velocity) {
     t["time_sec"].push_back(time);
@@ -107,11 +192,11 @@ Json Trajectory(const Json& profile) {
       while (next - heading < -kPi) next += 2 * kPi;
       heading = next;
     }
-    append(elapsed, points[i], heading, speed);
+    append(elapsed, points[i], heading, speeds[i]);
     if (i + 1 < points.size())
       elapsed += std::hypot(points[i + 1][0] - points[i][0],
                             points[i + 1][1] - points[i][1]) /
-                 speed;
+                 ((speeds[i] + speeds[i + 1]) / 2);
   }
   return t;
 }
@@ -141,6 +226,11 @@ Json Scene(const Json& profile) {
       {"scene-type", "UnrealNative"}};
 }
 
+std::string ActorFile(const std::size_t index) {
+  return index == 0 ? "target.jsonc"
+                    : "traffic-" + std::to_string(index) + ".jsonc";
+}
+
 Json Camera() {
   return {{"id", "Front"},
           {"type", "camera"},
@@ -167,14 +257,25 @@ void ValidateScenario(const std::filesystem::path& profile,
   if (settings.at("schema_version") != 1) {
     throw std::runtime_error("Unsupported scenario schema version");
   }
-  const auto& target = settings.at("target");
-  for (const auto* key : {"name", "asset", "display_name"}) {
-    if (target.at(key).get<std::string>().empty()) {
-      throw std::runtime_error("Target identifiers must not be empty");
+  const auto profiles = ActorProfiles(settings);
+  std::set<std::string> names{
+      settings.at("aircraft").at("name").get<std::string>()};
+  for (const auto& actor_profile : profiles) {
+    const auto& actor = actor_profile.at("target");
+    for (const auto* key : {"name", "asset", "display_name"}) {
+      if (actor.at(key).get<std::string>().empty()) {
+        throw std::runtime_error("Target identifiers must not be empty");
+      }
     }
-  }
-  if (!std::isfinite(target.at("visual_yaw_offset_deg").get<double>())) {
-    throw std::runtime_error("Invalid target visual rotation");
+    for (const auto* key : {"name", "display_name"}) {
+      if (!names.insert(actor.at(key).get<std::string>()).second) {
+        throw std::runtime_error("Actor and display names must be unique");
+      }
+    }
+    if (!std::isfinite(actor.at("visual_yaw_offset_deg").get<double>())) {
+      throw std::runtime_error("Invalid target visual rotation");
+    }
+    Trajectory(actor_profile);
   }
   const auto trajectory = Trajectory(settings);
   const auto size = trajectory.at("time_sec").size();
@@ -189,11 +290,25 @@ void ValidateScenario(const std::filesystem::path& profile,
   }
   std::filesystem::create_directories(directory);
   Write(directory / "trajectory.json", trajectory);
-  Write(directory / "scene.jsonc", Scene(settings));
+  auto scene = Scene(settings);
+  Json traffic = Json::array();
+  for (std::size_t i = 1; i < profiles.size(); ++i) {
+    const auto& actor = profiles[i].at("target");
+    scene["environment-actors"].push_back(
+        {{"type", "env_actor"},
+         {"name", actor.at("name")},
+         {"origin", {{"xyz", "0 0 0"}, {"rpy-deg", "0 0 0"}}},
+         {"env-actor-config", ActorFile(i)}});
+    traffic.push_back(actor);
+    Write(directory / ("traffic-" + std::to_string(i) + "-trajectory.json"),
+          Trajectory(profiles[i]));
+  }
+  Write(directory / "scene.jsonc", scene);
   Write(directory / "bindings.json",
         {{"aircraft", settings.at("aircraft").at("name")},
          {"camera", "Front"},
-         {"target", target}});
+         {"target", settings.at("target")},
+         {"traffic", traffic}});
 }
 
 void GenerateScenario(const std::filesystem::path& profile,
@@ -223,9 +338,12 @@ void GenerateScenario(const std::filesystem::path& profile,
     link.erase("inertial");
     link["collision"] = {{"enabled", false}};
   }
-  actor["script"] = {{"loop", true},
-                     {"auto_start", true},
-                     {"trajectory", Trajectory(Read(profile))}};
-  Write(directory / "target.jsonc", actor);
+  const auto profiles = ActorProfiles(Read(profile));
+  for (std::size_t i = 0; i < profiles.size(); ++i) {
+    actor["script"] = {{"loop", true},
+                       {"auto_start", true},
+                       {"trajectory", Trajectory(profiles[i])}};
+    Write(directory / ActorFile(i), actor);
+  }
 }
 }  // namespace raven::simulation

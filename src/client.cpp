@@ -40,11 +40,19 @@ void Client::Load(const std::filesystem::path& directory) {
   std::ifstream bindings_file(directory / "bindings.json");
   if (!bindings_file) throw std::runtime_error("Cannot read scene bindings");
   bindings_file >> bindings_;
-  const auto& target = bindings_.at("target");
   Check(world_->Initialize(client_, (directory / "scene.jsonc").string(),
                            directory.string(), 1),
         "Scene loading");
   prefix_ = world_->GetParentTopic();
+  actors_.clear();
+  const auto& target = bindings_.at("target");
+  actors_.push_back({target, Spawn(target)});
+  for (const auto& actor : bindings_.value("traffic", Json::array())) {
+    actors_.push_back({actor, Spawn(actor)});
+  }
+}
+
+std::string Client::Spawn(const Json& target) {
   // ListAssets also populates the simulator's asset cache before spawning.
   std::string asset_filter = "^";
   for (const char character : target.at("asset").get<std::string>()) {
@@ -60,20 +68,21 @@ void Client::Load(const std::filesystem::path& directory) {
   }
   const auto pose =
       Request("GetObjectPose", {{"object_name", target.at("name")}});
-  display_target_ =
+  const auto display =
       Request("SpawnObject", {{"object_name", target.at("display_name")},
                               {"asset_path", target.at("asset")},
                               {"pose", pose},
                               {"scale", {1, 1, 1}},
                               {"enable_physics", false}})
           .get<std::string>();
-  if (display_target_.empty())
+  if (display.empty())
     throw std::runtime_error("No display target was spawned");
   if (!Request("SetObjectScale",
                {{"object_name", target.at("name")}, {"scale", {0, 0, 0}}})
            .get<bool>()) {
     throw std::runtime_error("Could not hide trajectory fixture");
   }
+  return display;
 }
 
 void Client::Subscribe(sdk::Client::TopicCallback callback) {
@@ -93,7 +102,24 @@ Json Client::Sample() {
   if (time < previous_time_)
     throw std::runtime_error("Scene clock reset; restart the run");
   previous_time_ = time;
-  const auto& target = bindings_.at("target");
+  Json sample = {
+      {"sim_ns", time},
+      {"traffic", Json::array()},
+      {"aircraft",
+       Request("GetObjectPose", {{"object_name", bindings_.at("aircraft")}})}};
+  for (std::size_t i = 0; i < actors_.size(); ++i) {
+    const auto& actor = actors_[i];
+    const auto pose = UpdateDisplay(actor.target, actor.display);
+    if (i == 0)
+      sample["target"] = pose;
+    else
+      sample["traffic"].push_back(
+          {{"name", actor.target.at("name")}, {"pose", pose}});
+  }
+  return sample;
+}
+
+Json Client::UpdateDisplay(const Json& target, const std::string& display) {
   const auto pose =
       Request("GetObjectPose", {{"object_name", target.at("name")}});
   const auto& q = pose.at("rotation");
@@ -108,15 +134,12 @@ Json Client::Sample() {
                              {"y", 0},
                              {"z", std::sin(visual_yaw / 2)}};
   // Only the target's display mesh follows a script. PX4 controls the aircraft.
-  if (!Request("SetObjectPose", {{"object_name", display_target_},
+  if (!Request("SetObjectPose", {{"object_name", display},
                                  {"pose", visual_pose},
                                  {"teleport", true}})
            .get<bool>()) {
     throw std::runtime_error("Display target update failed");
   }
-  return {{"sim_ns", time},
-          {"target", pose},
-          {"aircraft", Request("GetObjectPose",
-                               {{"object_name", bindings_.at("aircraft")}})}};
+  return pose;
 }
 }  // namespace raven::simulation
