@@ -3,6 +3,7 @@
 
 #include <ProjectAirSimMessage/response_message.hpp>
 #include <cmath>
+#include <fstream>
 #include <stdexcept>
 #include <utility>
 
@@ -36,32 +37,49 @@ Json Client::Request(const std::string& method, const Json& parameters) {
 }
 
 void Client::Load(const std::filesystem::path& directory) {
+  std::ifstream bindings_file(directory / "bindings.json");
+  if (!bindings_file) throw std::runtime_error("Cannot read scene bindings");
+  bindings_file >> bindings_;
+  const auto& target = bindings_.at("target");
   Check(world_->Initialize(client_, (directory / "scene.jsonc").string(),
                            directory.string(), 1),
         "Scene loading");
   prefix_ = world_->GetParentTopic();
-  const auto assets = Request("ListAssets", {{"name", "^Car_01$"}});
-  if (!assets.is_array() || assets.empty()) {
-    throw std::runtime_error("Neighborhood Car_01 asset is unavailable");
+  // ListAssets also populates the simulator's asset cache before spawning.
+  std::string asset_filter = "^";
+  for (const char character : target.at("asset").get<std::string>()) {
+    if (std::string("\\.^$|()[]{}*+?").find(character) != std::string::npos) {
+      asset_filter += '\\';
+    }
+    asset_filter += character;
   }
-  const auto pose = Request("GetObjectPose", {{"object_name", "TargetCar"}});
-  display_car_ = Request("SpawnObject", {{"object_name", "ScenarioSedan"},
-                                         {"asset_path", "Car_01"},
-                                         {"pose", pose},
-                                         {"scale", {1, 1, 1}},
-                                         {"enable_physics", false}})
-                     .get<std::string>();
-  if (display_car_.empty())
-    throw std::runtime_error("No display car was spawned");
+  asset_filter += '$';
+  const auto assets = Request("ListAssets", {{"name", asset_filter}});
+  if (!assets.is_array() || assets.empty()) {
+    throw std::runtime_error("Scene assets are unavailable");
+  }
+  const auto pose =
+      Request("GetObjectPose", {{"object_name", target.at("name")}});
+  display_target_ =
+      Request("SpawnObject", {{"object_name", target.at("display_name")},
+                              {"asset_path", target.at("asset")},
+                              {"pose", pose},
+                              {"scale", {1, 1, 1}},
+                              {"enable_physics", false}})
+          .get<std::string>();
+  if (display_target_.empty())
+    throw std::runtime_error("No display target was spawned");
   if (!Request("SetObjectScale",
-               {{"object_name", "TargetCar"}, {"scale", {0, 0, 0}}})
+               {{"object_name", target.at("name")}, {"scale", {0, 0, 0}}})
            .get<bool>()) {
     throw std::runtime_error("Could not hide trajectory fixture");
   }
 }
 
 void Client::Subscribe(sdk::Client::TopicCallback callback) {
-  const auto topic = prefix_ + "/robots/CameraDrone/sensors/Front/scene_camera";
+  const auto topic =
+      prefix_ + "/robots/" + bindings_.at("aircraft").get<std::string>() +
+      "/sensors/" + bindings_.at("camera").get<std::string>() + "/scene_camera";
   Check(client_->Subscribe(topic.c_str(), std::move(callback)),
         "Camera subscription");
 }
@@ -75,26 +93,30 @@ Json Client::Sample() {
   if (time < previous_time_)
     throw std::runtime_error("Scene clock reset; restart the run");
   previous_time_ = time;
-  const auto pose = Request("GetObjectPose", {{"object_name", "TargetCar"}});
+  const auto& target = bindings_.at("target");
+  const auto pose =
+      Request("GetObjectPose", {{"object_name", target.at("name")}});
   const auto& q = pose.at("rotation");
   const double yaw =
       2 * std::atan2(q.at("z").get<double>(), q.at("w").get<double>());
   auto visual_pose = pose;
-  const double visual_yaw = yaw - 1.5707963267948966;
+  const double visual_yaw =
+      yaw + target.at("visual_yaw_offset_deg").get<double>() *
+                3.14159265358979323846 / 180;
   visual_pose["rotation"] = {{"w", std::cos(visual_yaw / 2)},
                              {"x", 0},
                              {"y", 0},
                              {"z", std::sin(visual_yaw / 2)}};
-  // Only the car's display mesh follows a script. PX4 controls the aircraft.
-  if (!Request("SetObjectPose", {{"object_name", display_car_},
+  // Only the target's display mesh follows a script. PX4 controls the aircraft.
+  if (!Request("SetObjectPose", {{"object_name", display_target_},
                                  {"pose", visual_pose},
                                  {"teleport", true}})
            .get<bool>()) {
-    throw std::runtime_error("Display car update failed");
+    throw std::runtime_error("Display target update failed");
   }
-  return {
-      {"sim_ns", time},
-      {"car", pose},
-      {"aircraft", Request("GetObjectPose", {{"object_name", "CameraDrone"}})}};
+  return {{"sim_ns", time},
+          {"target", pose},
+          {"aircraft", Request("GetObjectPose",
+                               {{"object_name", bindings_.at("aircraft")}})}};
 }
 }  // namespace raven::simulation

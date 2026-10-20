@@ -2,6 +2,8 @@
 
 - Keep application version 1.0.0 and upstream pins intact.
 - Use C++17, Google formatting, RAII and explicit errors for the host bridge.
+- Keep scene IDs, spawn poses, target assets and route parameters in scenario profiles. Share transport, video, clock and PX4 lifecycle code across scenarios; do not fork the bridge for each scene.
+- Keep scenario-specific target selection and acceptance criteria out of shared flight-session safety checks. Adding a profile does not mean its flight behavior has been validated.
 - Keep simulation fixtures separate from follower inputs; never drive the aircraft from a scripted camera pose.
 - Flight tests target only SITL system ID 2 under `/simulation`. Require recent disarmed M7 telemetry; never arm or command the real M7.
 - Preserve normal arming checks, timestamp checks, selected-identity behavior and the latched hold on target loss.

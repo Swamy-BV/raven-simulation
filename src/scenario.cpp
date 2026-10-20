@@ -27,7 +27,20 @@ void Write(const std::filesystem::path& path, const Json& value) {
   }
 }
 
-std::vector<Point> Route() {
+std::vector<Point> Route(const Json& route) {
+  if (route.at("type") != "rounded_rectangle") {
+    throw std::runtime_error("Unsupported route type");
+  }
+  const auto lower = route.at("min_xy_m").get<Point>();
+  const auto upper = route.at("max_xy_m").get<Point>();
+  const double radius = route.at("corner_radius_m").get<double>();
+  if (!std::isfinite(radius) || radius <= 0 || !std::isfinite(lower[0]) ||
+      !std::isfinite(lower[1]) || !std::isfinite(upper[0]) ||
+      !std::isfinite(upper[1]) || upper[0] - lower[0] <= 2 * radius ||
+      upper[1] - lower[1] <= 2 * radius || upper[0] - lower[0] > 10000 ||
+      upper[1] - lower[1] > 10000) {
+    throw std::runtime_error("Invalid rounded rectangle bounds or radius");
+  }
   std::vector<Point> points;
   const auto line = [&](const Point& a, const Point& b) {
     const int count =
@@ -41,31 +54,35 @@ std::vector<Point> Route() {
     constexpr int kSamples = 12;
     for (int i = 0; i < kSamples; ++i) {
       const double angle = a + (b - a) * i / kSamples;
-      points.push_back(
-          {center[0] + 6 * std::cos(angle), center[1] + 6 * std::sin(angle)});
+      points.push_back({center[0] + radius * std::cos(angle),
+                        center[1] + radius * std::sin(angle)});
     }
   };
-  line({2, -10}, {2, 106});
-  arc({8, 106}, kPi, kPi / 2);
-  line({8, 112}, {124, 112});
-  arc({124, 106}, kPi / 2, 0);
-  line({130, 106}, {130, -10});
-  arc({124, -10}, 0, -kPi / 2);
-  line({124, -16}, {8, -16});
-  arc({8, -10}, -kPi / 2, -kPi);
+  const double left = lower[0], bottom = lower[1];
+  const double right = upper[0], top = upper[1];
+  line({left, bottom + radius}, {left, top - radius});
+  arc({left + radius, top - radius}, kPi, kPi / 2);
+  line({left + radius, top}, {right - radius, top});
+  arc({right - radius, top - radius}, kPi / 2, 0);
+  line({right, top - radius}, {right, bottom + radius});
+  arc({right - radius, bottom + radius}, 0, -kPi / 2);
+  line({right - radius, bottom}, {left + radius, bottom});
+  arc({left + radius, bottom + radius}, -kPi / 2, -kPi);
   points.push_back(points.front());
   return points;
 }
 
 Json Trajectory(const Json& profile) {
-  const double speed = profile.at("car_speed_mps").get<double>();
-  const double delay = profile.at("car_start_delay_s").get<double>();
+  const double speed = profile.at("target_speed_mps").get<double>();
+  const double delay = profile.at("target_start_delay_s").get<double>();
+  const double height = profile.at("target").at("height_ned_m").get<double>();
   if (!std::isfinite(speed) || speed <= 0 || speed > 10 ||
-      !std::isfinite(delay) || delay <= 0 || delay > 300) {
-    throw std::runtime_error("Invalid car speed or start delay");
+      !std::isfinite(delay) || delay <= 0 || delay > 300 ||
+      !std::isfinite(height)) {
+    throw std::runtime_error("Invalid target speed, start delay or height");
   }
-  const auto points = Route();
-  Json t = {{"name", "neighborhood_street_loop"}};
+  const auto points = Route(profile.at("route"));
+  Json t = {{"name", profile.at("scene_id")}};
   double elapsed = delay;
   double heading = kPi / 2;
   const auto append = [&](const double time, const Point& point,
@@ -73,7 +90,7 @@ Json Trajectory(const Json& profile) {
     t["time_sec"].push_back(time);
     t["pose_x"].push_back(point[0]);
     t["pose_y"].push_back(point[1]);
-    t["pose_z"].push_back(-0.75);
+    t["pose_z"].push_back(height);
     t["pose_roll"].push_back(0);
     t["pose_pitch"].push_back(0);
     t["pose_yaw"].push_back(yaw);
@@ -99,19 +116,21 @@ Json Trajectory(const Json& profile) {
   return t;
 }
 
-Json Scene() {
+Json Scene(const Json& profile) {
+  const auto& aircraft = profile.at("aircraft");
   return {
-      {"id", "CarLoop"},
+      {"id", profile.at("scene_id")},
       {"actors",
        {{{"type", "robot"},
-         {"name", "CameraDrone"},
-         {"origin", {{"xyz", "2 -18 -4"}, {"rpy-deg", "0 0 90"}}},
+         {"name", aircraft.at("name")},
+         {"origin",
+          {{"xyz", aircraft.at("xyz")}, {"rpy-deg", aircraft.at("rpy_deg")}}},
          {"robot-config", "camera.jsonc"}}}},
       {"environment-actors",
        {{{"type", "env_actor"},
-         {"name", "TargetCar"},
+         {"name", profile.at("target").at("name")},
          {"origin", {{"xyz", "0 0 0"}, {"rpy-deg", "0 0 0"}}},
-         {"env-actor-config", "car-loop.jsonc"}}}},
+         {"env-actor-config", "target.jsonc"}}}},
       {"clock",
        {{"type", "steppable"},
         {"step-ns", 4000000},
@@ -144,7 +163,20 @@ Json Camera() {
 
 void ValidateScenario(const std::filesystem::path& profile,
                       const std::filesystem::path& directory) {
-  const auto trajectory = Trajectory(Read(profile));
+  const auto settings = Read(profile);
+  if (settings.at("schema_version") != 1) {
+    throw std::runtime_error("Unsupported scenario schema version");
+  }
+  const auto& target = settings.at("target");
+  for (const auto* key : {"name", "asset", "display_name"}) {
+    if (target.at(key).get<std::string>().empty()) {
+      throw std::runtime_error("Target identifiers must not be empty");
+    }
+  }
+  if (!std::isfinite(target.at("visual_yaw_offset_deg").get<double>())) {
+    throw std::runtime_error("Invalid target visual rotation");
+  }
+  const auto trajectory = Trajectory(settings);
   const auto size = trajectory.at("time_sec").size();
   for (const auto& field : trajectory.items()) {
     if (field.key() != "name" && field.value().size() != size) {
@@ -157,7 +189,11 @@ void ValidateScenario(const std::filesystem::path& profile,
   }
   std::filesystem::create_directories(directory);
   Write(directory / "trajectory.json", trajectory);
-  Write(directory / "scene.jsonc", Scene());
+  Write(directory / "scene.jsonc", Scene(settings));
+  Write(directory / "bindings.json",
+        {{"aircraft", settings.at("aircraft").at("name")},
+         {"camera", "Front"},
+         {"target", target}});
 }
 
 void GenerateScenario(const std::filesystem::path& profile,
@@ -190,6 +226,6 @@ void GenerateScenario(const std::filesystem::path& profile,
   actor["script"] = {{"loop", true},
                      {"auto_start", true},
                      {"trajectory", Trajectory(Read(profile))}};
-  Write(directory / "car-loop.jsonc", actor);
+  Write(directory / "target.jsonc", actor);
 }
 }  // namespace raven::simulation

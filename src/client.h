@@ -28,7 +28,8 @@ class Client {
   std::shared_ptr<sdk::Client> client_;
   std::shared_ptr<sdk::World> world_;
   std::string prefix_;
-  std::string display_car_;
+  Json bindings_;
+  std::string display_target_;
   std::int64_t previous_time_ = 0;
 };
 }  // namespace raven::simulation

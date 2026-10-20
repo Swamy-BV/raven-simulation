@@ -22,6 +22,10 @@ flowchart LR
 - `tests/`: opt-in Python `unittest` integration tests using the board's existing ROS packages. Python is only the validation harness.
 - `results/`: small, sanitized validation summaries. Downloads, binaries, logs and recordings are excluded from Git.
 
+Scenario profiles own the scene ID, aircraft spawn, target asset, visual alignment and route parameters. The shared client consumes generated bindings instead of assuming a particular car or scene name. Video, clock and PX4 lifecycle code stay shared. Each profile is discovered by CTest for offline validation; flight tests remain explicit and scenario-specific. The current `follow` test targets the street-loop car profile.
+
+To add a scenario, add a profile under `scenarios/` and select it in the bridge command. Rounded-rectangle routes are currently supported; new route types need a generator in `src/scenario.cpp`. New environments also require their assets to be installed in AirSim. This does not imply arbitrary actors or environments already work.
+
 This uses **IAMAI ProjectAirSim v1.0.1**, the continuation linked by Microsoft's original AirSim project. Source and environment pins are in `versions.env`. The PX4 checkout must match Raven's `px4_msgs`; do not substitute an older PX4 release to match an example.
 
 ## Install
@@ -53,7 +57,7 @@ ctest --test-dir build --output-on-failure
 From Windows PowerShell, run these scripts from a **Windows clone** of this repository. Keep the WSL clone for builds; Windows treats scripts on a WSL UNC path as remote files under its execution policy.
 
 ```powershell
-.\Install-Windows.ps1 -Prerequisites
+.\scripts\Install-Windows.ps1 -Prerequisites
 ```
 
 This installs the Microsoft Visual C++ and DirectX prerequisites and downloads the approximately 1.8 GB Neighborhood environment. It verifies the pinned SHA-256 before extraction. Downloads go to the current user's local application-data directory, not the repository. `-DataDirectory` selects another location; `-Archive` reuses an existing ZIP.
@@ -61,13 +65,13 @@ This installs the Microsoft Visual C++ and DirectX prerequisites and downloads t
 Get the WSL IPv4 address with `wsl -d Ubuntu-22.04 hostname -I`. In an **administrator PowerShell**, configure the narrowly scoped inbound rules:
 
 ```powershell
-.\Enable-WslFirewall.ps1 -WslAddress <WSL_IPV4>
+.\scripts\Enable-WslFirewall.ps1 -WslAddress <WSL_IPV4>
 ```
 
 Rules allow only the simulator executable and that WSL address: TCP 4560/8989/8990 and UDP 14580. Repeat after a WSL address change. Start rendering in a normal PowerShell:
 
 ```powershell
-.\Start-Simulator.ps1 -GraphicsAdapter 0
+.\scripts\Start-Simulator.ps1 -GraphicsAdapter 0
 ```
 
 Select the NVIDIA adapter index on your machine; check GPU activity with `nvidia-smi`. Add `-Visible` for a simulator window. The default renders offscreen.

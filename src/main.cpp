@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
   try {
     if (argc == 4 && std::string(argv[1]) == "--validate") {
       ValidateScenario(argv[2], argv[3]);
-      std::cout << "Closed street trajectory validated\n";
+      std::cout << "Scenario validated\n";
       return 0;
     }
     if (argc != 7) {

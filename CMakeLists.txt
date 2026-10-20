@@ -24,8 +24,11 @@ target_link_libraries(airsim-bridge PRIVATE ProjectAirSim::Client PkgConfig::GST
                                             "${XRCE_DIR}/lib/libmicroxrcedds_client.a" "${XRCE_DIR}/lib/libmicrocdr.a")
 include(CTest)
 if(BUILD_TESTING)
-  add_test(NAME scene-validation
-           COMMAND airsim-bridge --validate "${CMAKE_CURRENT_SOURCE_DIR}/scenarios/street-loop.jsonc"
-                   "${CMAKE_CURRENT_BINARY_DIR}/validated-scene")
+  file(GLOB SCENARIO_PROFILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/scenarios/*.jsonc")
+  foreach(PROFILE IN LISTS SCENARIO_PROFILES)
+    get_filename_component(SCENARIO_NAME "${PROFILE}" NAME_WE)
+    add_test(NAME "scenario-${SCENARIO_NAME}" COMMAND airsim-bridge --validate "${PROFILE}"
+                                                      "${CMAKE_CURRENT_BINARY_DIR}/validated/${SCENARIO_NAME}")
+  endforeach()
 endif()
 install(TARGETS airsim-bridge RUNTIME DESTINATION bin)

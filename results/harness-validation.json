@@ -11,5 +11,12 @@
   "flight_test_hover_wall_seconds": 52.839,
   "flight_test_follow": "not rerun after harness reorganization; prior sustained test failed",
   "real_m7_arming_state_after_restore": "disarmed",
-  "physical_camera_restored": true
+  "physical_camera_restored": true,
+  "scenario_modularity": {
+    "cpp17_build_and_ctest": "passed",
+    "baseline_street_loop_trajectory_preserved": "passed within 1e-12 tolerance",
+    "alternate_profile_identifiers_assets_and_route_bounds": "passed offline generation",
+    "invalid_route_radius_bounds_and_schema": "rejected as expected",
+    "flight_tests_after_profile_refactor": "not rerun"
+  }
 }
