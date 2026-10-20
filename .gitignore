@@ -1,0 +1,11 @@
+.deps/
+build/
+run/
+results/local/
+__pycache__/
+*.pyc
+*.mp4
+*.tar*
+*.zip
+*.log
+.env

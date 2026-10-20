@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-20",
+  "scope": "reorganized repository harness",
+  "cpp17_build_warnings_as_errors": "passed",
+  "offline_scene_validation": "passed",
+  "shellcheck": "passed",
+  "windows_script_parsing": "passed",
+  "windows_archive_checksum": "passed using cached release archive",
+  "wsl_sdk_install": "passed using pinned existing dependency checkout",
+  "flight_test_hover": "passed",
+  "flight_test_hover_wall_seconds": 52.839,
+  "flight_test_follow": "not rerun after harness reorganization; prior sustained test failed",
+  "real_m7_arming_state_after_restore": "disarmed",
+  "physical_camera_restored": true
+}

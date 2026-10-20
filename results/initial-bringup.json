@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-20",
+  "scope": "bench evidence before harness reorganization",
+  "projectairsim_version": "1.0.1",
+  "px4_commit": "fffec82b2f970e5fec94174d5e1289c55a4ac52f",
+  "street_loop": {"repeat_verified": true, "lap_sim_seconds": 250.844188257459},
+  "flight": {"takeoff": "passed", "hover_height_m": 4.5, "hover": "passed", "landing": "passed", "disarm": "passed"},
+  "following": {
+    "activation": "passed",
+    "wall_seconds_before_hold": 8.000334034000844,
+    "approximate_sim_seconds": 4,
+    "displacement_m": 0.46580313511759336,
+    "hold_drift_m": 0.027279633255689356,
+    "sustained_25_seconds": "failed",
+    "reason": "Selected identity expired; latched hold required explicit re-selection"
+  },
+  "real_m7_remained_disarmed": true,
+  "physical_camera_restored_after_test": true,
+  "native_recording_real_fps": 17.40481813444013
+}

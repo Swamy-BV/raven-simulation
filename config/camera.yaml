@@ -1,0 +1,21 @@
+# AirSim pinhole camera: 640x360, horizontal FOV 1.4 rad, no distortion.
+image_width: 640
+image_height: 360
+camera_name: front_camera
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [379.917386280537, 0.0, 320.0, 0.0, 379.917386280537, 180.0, 0.0, 0.0, 1.0]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.0, 0.0, 0.0, 0.0, 0.0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [379.917386280537, 0.0, 320.0, 0.0, 0.0, 379.917386280537, 180.0, 0.0, 0.0, 0.0, 1.0, 0.0]
