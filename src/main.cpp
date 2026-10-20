@@ -44,9 +44,10 @@ int main(int argc, char** argv) {
     GenerateScenario(argv[4], argv[3], directory / "config", argv[1]);
     std::signal(SIGINT, Stop);
     std::signal(SIGTERM, Stop);
-    Video video(argv[2], directory);
-    Client client(argv[1]);
     ClockBridge clock(argv[2]);
+    Video video(argv[2], directory,
+                [&clock](std::int64_t stamp) { clock.Send(stamp); });
+    Client client(argv[1]);
     client.Load(directory / "config");
     client.Subscribe([&video](const std::string&, const std::string& bytes) {
       video.Receive(bytes);
@@ -57,7 +58,11 @@ int main(int argc, char** argv) {
     auto report = start;
     while (gStop == 0 && std::chrono::steady_clock::now() - start <
                              std::chrono::seconds(seconds)) {
-      const auto sample = client.Sample();
+      auto sample = client.Sample();
+      sample["sample_steady_ns"] =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::steady_clock::now().time_since_epoch())
+              .count();
       clock.Send(sample.at("sim_ns").get<std::int64_t>());
       poses << sample.dump() << '\n';
       if (!poses) throw std::runtime_error("Pose log failed");

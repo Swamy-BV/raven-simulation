@@ -64,7 +64,8 @@ class ClockBridge {
   ClockBridge& operator=(const ClockBridge&) = delete;
 
   void Send(std::int64_t time_ns) {
-    if (time_ns <= 0) return;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (time_ns <= last_sent_ns_) return;
     ucdrBuffer buffer;
     if (uxr_prepare_output_stream(&session_, best_effort_, writer_, &buffer,
                                   8) == UXR_INVALID_REQUEST_ID ||
@@ -76,6 +77,7 @@ class ClockBridge {
     }
     uxr_flash_output_streams(&session_);
     uxr_run_session_timeout(&session_, 0);
+    last_sent_ns_ = time_ns;
   }
 
  private:
@@ -117,6 +119,8 @@ class ClockBridge {
                                             requests.size());
   }
 
+  std::mutex mutex_;
+  std::int64_t last_sent_ns_ = 0;
   uxrUDPTransport transport_{};
   uxrSession session_{};
   uxrStreamId reliable_{};

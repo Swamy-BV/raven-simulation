@@ -132,11 +132,21 @@ export PX4_SOURCE_DIR=../PX4-Autopilot
 
 ## Results and limits
 
-The initial bench validation passed PX4 takeoff, 4.5 m hover, landing, disarm and end-to-end follower activation. Following lasted about **8 wall-clock seconds / 4 simulated seconds**, with 0.47 m movement, before the selected track expired. The aircraft held and landed; the real M7 stayed disarmed. **Sustained following is not passing yet.** See `results/initial-bringup.json`.
+The low-speed `street-follow.jsonc` profile passed **25.008 simulated seconds / 40.20 wall seconds** of selected-car following, then identity-loss hold, landing and disarm. The target speed was 0.1 m/s. A separate interrupted-camera test latched hold and landed, and five-second-old ROS images produced no detections. These do not validate the faster default loop, multiple cars, viewpoint changes or physical flight. See `results/timing-validation.json`; older baseline results remain historical evidence.
 
 Capture/sender/ROS profiles request 30 fps; this is not a measured throughput guarantee. The last full PX4 recording measured about 17.4 fps in real time. Track simulation-time rate, real-time rate and review-video sampling separately.
 
-Each bridge run saves `camera.mp4`, `frames.jsonl` (source simulation timestamp and MP4 presentation timestamp), `poses.jsonl` and the generated `config/`. Board test artifacts are under `/tmp/raven-simulation-results/`. Pose logs are evaluation evidence, not inputs to the follower.
+Each bridge run saves `camera.mp4`, `frames.jsonl` (capture/host timing and sender queue occupancy), `encoded.jsonl` (encoder output timing), `poses.jsonl` and generated `config/`. Pose logs are evaluation evidence, not follower inputs. The RTP sender carries the original capture time using NTP-64; the board explicitly enables this shared simulation-clock policy.
+
+For per-frame timing, start the board with `RAVEN_SIM_TRACE=1 ./scripts/board.sh start "$BOARD_IP"`. Save the four service journals for that single scene/boot as a text trace, then run:
+
+```bash
+python3 tests/analyze_timing.py run/timing.log --sender-run run/session-01
+```
+
+ROS source age and steady wall-time stage latency are reported separately. The two machines' steady clocks are not assumed synchronized. A hold has no perception input and is traced with source timestamp zero. Future images can be rejected while asynchronous `/clock` updates catch up; never restamp them as fresh.
+
+`tests/test_stale_input.py` is a separate opt-in board check: stop capture, restart inference/tracking, keep both PX4 instances disarmed, and set `RAVEN_SIM_STALE_INPUT=1`. It injects five-second-old ROS images and requires stale-input rejection without detections. Restore camera services afterward.
 
 Offline checks need neither a board nor a running simulator:
 
@@ -147,7 +157,7 @@ shellcheck -x scripts/*.sh
 clang-format --dry-run --Werror src/*.cpp src/*.h
 ```
 
-The reorganized harness also passed its on-board hover test; installation and check details are in `results/harness-validation.json`. Sustained following has not been rerun after reorganization. A build or skipped hardware test is not a flight pass.
+The reorganized harness also passed its on-board hover test; installation and check details are in `results/harness-validation.json`. The later low-speed timing/following validation is recorded separately. A build or skipped hardware test is not a flight pass.
 
 ## License
 

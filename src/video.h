@@ -3,14 +3,17 @@
 #include <gst/gst.h>
 
 #include <atomic>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <string>
 
 namespace raven::simulation {
 class Video {
  public:
-  Video(const std::string& host, const std::filesystem::path& directory);
+  Video(const std::string& host, const std::filesystem::path& directory,
+        std::function<void(std::int64_t)> source_clock);
   ~Video();
   Video(const Video&) = delete;
   Video& operator=(const Video&) = delete;
@@ -22,9 +25,13 @@ class Video {
   unsigned Rejected() const { return rejected_.load(); }
 
  private:
+  static GstPadProbeReturn Encoded(GstPad*, GstPadProbeInfo* info,
+                                   gpointer data);
   GstElement* pipeline_ = nullptr;
   GstElement* source_ = nullptr;
   std::ofstream frame_log_;
+  std::ofstream encoded_log_;
+  std::function<void(std::int64_t)> source_clock_;
   std::atomic<unsigned> frames_{0};
   std::atomic<unsigned> rejected_{0};
   bool finished_ = false;

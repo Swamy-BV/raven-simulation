@@ -4,13 +4,22 @@
 #include <gst/app/gstappsrc.h>
 
 #include <ProjectAirSimMessage/image_message.hpp>
+#include <chrono>
 #include <json.hpp>
+#include <memory>
 #include <stdexcept>
+#include <utility>
+
+#include "rtp_time.h"
 
 namespace raven::simulation {
-Video::Video(const std::string& host, const std::filesystem::path& directory)
-    : frame_log_(directory / "frames.jsonl") {
-  if (!frame_log_) throw std::runtime_error("Cannot create frame log");
+Video::Video(const std::string& host, const std::filesystem::path& directory,
+             std::function<void(std::int64_t)> source_clock)
+    : frame_log_(directory / "frames.jsonl"),
+      encoded_log_(directory / "encoded.jsonl"),
+      source_clock_(std::move(source_clock)) {
+  if (!frame_log_ || !encoded_log_)
+    throw std::runtime_error("Cannot create frame logs");
   gst_init(nullptr, nullptr);
   GError* error = nullptr;
   pipeline_ = gst_parse_launch(
@@ -21,7 +30,7 @@ Video::Video(const std::string& host, const std::filesystem::path& directory)
       "! video/x-raw,format=I420 ! x264enc tune=zerolatency "
       "speed-preset=ultrafast "
       "bitrate=2000 key-int-max=30 threads=2 ! h264parse ! tee name=encoded "
-      "encoded. ! queue ! rtph264pay pt=96 config-interval=1 "
+      "encoded. ! queue ! rtph264pay name=rtp pt=96 config-interval=1 "
       "! udpsink name=network port=5602 sync=false async=false "
       "encoded. ! queue ! mp4mux faststart=true "
       "! filesink name=record sync=false async=false",
@@ -36,6 +45,13 @@ Video::Video(const std::string& host, const std::filesystem::path& directory)
   }
   auto* network = gst_bin_get_by_name(GST_BIN(pipeline_), "network");
   auto* record = gst_bin_get_by_name(GST_BIN(pipeline_), "record");
+  auto* payloader = gst_bin_get_by_name(GST_BIN(pipeline_), "rtp");
+  auto* encoded_pad = gst_element_get_static_pad(payloader, "sink");
+  gst_pad_add_probe(encoded_pad, GST_PAD_PROBE_TYPE_BUFFER, Encoded, this,
+                    nullptr);
+  gst_object_unref(encoded_pad);
+  ConfigureCaptureTime(payloader);
+  gst_object_unref(payloader);
   source_ = gst_bin_get_by_name(GST_BIN(pipeline_), "frames");
   const auto output = (directory / "camera.mp4").string();
   g_object_set(network, "host", host.c_str(), nullptr);
@@ -69,6 +85,9 @@ Video::~Video() {
 }
 
 void Video::Receive(const std::string& bytes) noexcept {
+  const auto received = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count();
   try {
     microsoft::projectairsim::ImageMessage image;
     image.Deserialize(bytes);
@@ -78,6 +97,10 @@ void Video::Receive(const std::string& bytes) noexcept {
       ++rejected_;
       return;
     }
+    // Publish the known acquisition time before its video can arrive. The
+    // clock bridge serializes this with polled simulator time and never
+    // regresses.
+    source_clock_(image.GetTimestamp());
     auto* clock = gst_element_get_clock(pipeline_);
     if (clock == nullptr) {
       ++rejected_;
@@ -86,27 +109,64 @@ void Video::Receive(const std::string& bytes) noexcept {
     const auto pts =
         gst_clock_get_time(clock) - gst_element_get_base_time(pipeline_);
     gst_object_unref(clock);
-    auto* buffer = gst_buffer_new_allocate(nullptr, pixels.size(), nullptr);
+    std::unique_ptr<GstBuffer, decltype(&gst_buffer_unref)> buffer(
+        gst_buffer_new_allocate(nullptr, pixels.size(), nullptr),
+        gst_buffer_unref);
     if (buffer == nullptr) {
       ++rejected_;
       return;
     }
-    gst_buffer_fill(buffer, 0, pixels.data(), pixels.size());
-    GST_BUFFER_PTS(buffer) = pts;
-    GST_BUFFER_DURATION(buffer) = GST_SECOND / 30;
-    if (gst_app_src_push_buffer(GST_APP_SRC(source_), buffer) != GST_FLOW_OK) {
+    gst_buffer_fill(buffer.get(), 0, pixels.data(), pixels.size());
+    AttachCaptureTime(buffer.get(), image.GetTimestamp());
+    GST_BUFFER_PTS(buffer.get()) = pts;
+    GST_BUFFER_DURATION(buffer.get()) = GST_SECOND / 30;
+    if (gst_app_src_push_buffer(GST_APP_SRC(source_), buffer.release()) !=
+        GST_FLOW_OK) {
       ++rejected_;
       return;
     }
     frame_log_ << nlohmann::json{{"index", frames_.load()},
                                  {"pts_ns", pts},
-                                 {"source_sim_ns", image.GetTimestamp()}}
+                                 {"source_sim_ns", image.GetTimestamp()},
+                                 {"receive_steady_ns", received},
+                                 {"queued_bytes",
+                                  gst_app_src_get_current_level_bytes(
+                                      GST_APP_SRC(source_))}}
                       .dump()
                << '\n';
     if (!frame_log_) throw std::runtime_error("Frame log failed");
     ++frames_;
   } catch (const std::exception&) {
     ++rejected_;
+  }
+}
+
+GstPadProbeReturn Video::Encoded(GstPad*, GstPadProbeInfo* info,
+                                 gpointer data) {
+  auto& self = *static_cast<Video*>(data);
+  try {
+    auto* caps = gst_caps_new_empty_simple("timestamp/x-ntp");
+    auto* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+    const auto* origin = gst_buffer_get_reference_timestamp_meta(buffer, caps);
+    gst_caps_unref(caps);
+    if (!origin || origin->timestamp < 2208988800ULL * GST_SECOND)
+      throw std::runtime_error("Encoded frame lost acquisition identity");
+    const auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                          std::chrono::steady_clock::now().time_since_epoch())
+                          .count();
+    self.encoded_log_ << nlohmann::json{{"source_sim_ns",
+                                         origin->timestamp -
+                                             2208988800ULL * GST_SECOND},
+                                        {"encoded_steady_ns", time},
+                                        {"bytes", gst_buffer_get_size(buffer)}}
+                             .dump()
+                      << '\n';
+    if (!self.encoded_log_)
+      throw std::runtime_error("Encoded frame log failed");
+    return GST_PAD_PROBE_OK;
+  } catch (const std::exception&) {
+    ++self.rejected_;
+    return GST_PAD_PROBE_DROP;
   }
 }
 

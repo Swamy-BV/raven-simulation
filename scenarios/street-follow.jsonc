@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "scene_id": "CarLoop",
+  "aircraft": {
+    "name": "CameraDrone",
+    "xyz": "-6 -10 -4",
+    "rpy_deg": "0 0 0"
+  },
+  "target": {
+    "name": "TargetCar",
+    "asset": "Car_01",
+    "display_name": "ScenarioSedan",
+    "visual_yaw_offset_deg": -90,
+    "height_ned_m": -0.75
+  },
+  "route": {
+    "type": "rounded_rectangle",
+    "min_xy_m": [
+      2,
+      -16
+    ],
+    "max_xy_m": [
+      130,
+      112
+    ],
+    "corner_radius_m": 6
+  },
+  "target_speed_mps": 0.1,
+  "target_start_delay_s": 60
+}
