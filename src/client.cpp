@@ -32,7 +32,8 @@ Json Client::Request(const std::string& method, const Json& parameters) {
   microsoft::projectairsim::ResponseMessage response;
   response.Deserialize(static_cast<std::string>(message));
   if (response.GetErrorCode() != 0)
-    throw std::runtime_error(method + " rejected");
+    throw std::runtime_error(method + " rejected for " + parameters.dump() +
+                             ": " + response.GetResult().dump());
   return response.GetResult();
 }
 
@@ -46,9 +47,9 @@ void Client::Load(const std::filesystem::path& directory) {
   prefix_ = world_->GetParentTopic();
   actors_.clear();
   const auto& target = bindings_.at("target");
-  actors_.push_back({target, Spawn(target)});
+  actors_.push_back({target, Spawn(target), {}});
   for (const auto& actor : bindings_.value("traffic", Json::array())) {
-    actors_.push_back({actor, Spawn(actor)});
+    actors_.push_back({actor, Spawn(actor), {}});
   }
 }
 
@@ -108,8 +109,8 @@ Json Client::Sample() {
       {"aircraft",
        Request("GetObjectPose", {{"object_name", bindings_.at("aircraft")}})}};
   for (std::size_t i = 0; i < actors_.size(); ++i) {
-    const auto& actor = actors_[i];
-    const auto pose = UpdateDisplay(actor.target, actor.display);
+    auto& actor = actors_[i];
+    const auto pose = UpdateDisplay(actor);
     if (i == 0)
       sample["target"] = pose;
     else
@@ -119,7 +120,9 @@ Json Client::Sample() {
   return sample;
 }
 
-Json Client::UpdateDisplay(const Json& target, const std::string& display) {
+Json Client::UpdateDisplay(DisplayActor& actor) {
+  const auto& target = actor.target;
+  const auto& display = actor.display;
   const auto pose =
       Request("GetObjectPose", {{"object_name", target.at("name")}});
   const auto& q = pose.at("rotation");
@@ -133,6 +136,8 @@ Json Client::UpdateDisplay(const Json& target, const std::string& display) {
                              {"x", 0},
                              {"y", 0},
                              {"z", std::sin(visual_yaw / 2)}};
+  // Avoid asking Unreal to move a stationary mesh to its unchanged pose.
+  if (actor.previous_pose == visual_pose) return pose;
   // Only the target's display mesh follows a script. PX4 controls the aircraft.
   if (!Request("SetObjectPose", {{"object_name", display},
                                  {"pose", visual_pose},
@@ -140,6 +145,7 @@ Json Client::UpdateDisplay(const Json& target, const std::string& display) {
            .get<bool>()) {
     throw std::runtime_error("Display target update failed");
   }
+  actor.previous_pose = visual_pose;
   return pose;
 }
 }  // namespace raven::simulation

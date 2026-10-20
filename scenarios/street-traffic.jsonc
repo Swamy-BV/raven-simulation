@@ -25,9 +25,9 @@
     ],
     "corner_radius_m": 6
   },
-  "target_speed_mps": 8,
+  "target_speed_mps": 17.8816,
   "target_start_delay_s": 60,
-  "vehicle_acceleration_mps2": 2,
+  "vehicle_acceleration_mps2": 3,
   "vehicle_lateral_acceleration_mps2": 2,
   "traffic": [
     {

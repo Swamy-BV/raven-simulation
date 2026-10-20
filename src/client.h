@@ -25,18 +25,19 @@ class Client {
   Json Sample();
 
  private:
+  struct DisplayActor {
+    Json target;
+    std::string display;
+    Json previous_pose;
+  };
+
   Json Request(const std::string& method, const Json& parameters);
   std::string Spawn(const Json& target);
-  Json UpdateDisplay(const Json& target, const std::string& display);
+  Json UpdateDisplay(DisplayActor& actor);
   std::shared_ptr<sdk::Client> client_;
   std::shared_ptr<sdk::World> world_;
   std::string prefix_;
   Json bindings_;
-
-  struct DisplayActor {
-    Json target;
-    std::string display;
-  };
 
   std::vector<DisplayActor> actors_;
   std::int64_t previous_time_ = 0;

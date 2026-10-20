@@ -130,7 +130,11 @@ export PX4_SOURCE_DIR=../PX4-Autopilot
 
    Finally run `Start-Simulator.ps1 -Stop` in Windows. Board stop restores the physical camera and leaves the follower stopped. Run only one simulation session at a time.
 
+`street-traffic.jsonc` requests **40 mph (17.8816 m/s)** cruising, accelerates at 3 m/s² and slows for corners using a 2 m/s² lateral limit. It includes two additional cars. The current follower is capped at 0.6 m/s and cannot keep up; this profile does not establish high-speed following. The low-speed validation profile remains unchanged.
+
 ## Results and limits
+
+The 40 mph traffic profile reached **40.00 mph measured from live simulator positions** with two traffic cars present. PX4 SITL and the real M7 remained disarmed; high-speed following was not attempted. See `results/car-40mph-validation.json`.
 
 The low-speed `street-follow.jsonc` profile passed **25.008 simulated seconds / 40.20 wall seconds** of selected-car following, then identity-loss hold, landing and disarm. The target speed was 0.1 m/s. A separate interrupted-camera test latched hold and landed, and five-second-old ROS images produced no detections. These do not validate the faster default loop, multiple cars, viewpoint changes or physical flight. See `results/timing-validation.json`; older baseline results remain historical evidence.
 

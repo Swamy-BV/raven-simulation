@@ -1,0 +1,60 @@
+{
+  "scenario_profile": "scenarios/street-traffic.jsonc",
+  "status": "car_cruise_validated_following_not_tested",
+  "requested_speed_mph": 40,
+  "requested_speed_mps": 17.8816,
+  "acceleration_mps2": 3,
+  "corner_lateral_acceleration_limit_mps2": 2,
+  "traffic_cars": 2,
+  "measured_cruise_windows": [
+    {
+      "samples": 38,
+      "start_sim_s": 66.06,
+      "end_sim_s": 66.568,
+      "distance_m": 9.155391693115234,
+      "speed_mps": 18.022424592746525,
+      "speed_mph": 40.31501564232848
+    },
+    {
+      "samples": 41,
+      "start_sim_s": 78.6,
+      "end_sim_s": 79.26,
+      "distance_m": 11.802043914794922,
+      "speed_mps": 17.881884719386246,
+      "speed_mph": 40.000636899128146
+    }
+  ],
+  "simulation_time_end_s": 82.98,
+  "vehicle_telemetry": {
+    "m7": {
+      "count": 9,
+      "system_ids": [
+        1
+      ],
+      "arming_states": [
+        1
+      ]
+    },
+    "sitl": {
+      "count": 5,
+      "system_ids": [
+        2
+      ],
+      "arming_states": [
+        1
+      ]
+    }
+  },
+  "offline_scenario_checks": {
+    "passed": 3,
+    "failed": 0
+  },
+  "follower_max_speed_mps": 0.6,
+  "notes": [
+    "Speed measured from AirSim target positions against simulation time; wall time is not assumed real time.",
+    "Car slows for corners and follows a scripted trajectory, not a full car dynamics model.",
+    "PX4 SITL connected but remained disarmed. No 40 mph drone-following claim.",
+    "Cached successful display poses to avoid redundant stationary SetObjectPose calls rejected by Unreal.",
+    "Previous low-speed evidence remains unchanged."
+  ]
+}
