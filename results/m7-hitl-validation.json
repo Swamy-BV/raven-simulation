@@ -176,5 +176,35 @@
     "source_ground_truth_used_for_control": false,
     "yaw_control": "0.4-second damped bearing response with bounded heading-rate feed-forward",
     "relative_velocity_yaw_experiment_retained": false
+  },
+  "windows_timer_validation": {
+    "fault": "Hidden Windows 11 simulator did not honor its requested timer precision",
+    "fix": "Honor timer-resolution requests only for the simulator process at launch",
+    "system_power_policy_changed": false,
+    "baseline_imu_hz": 64.14484170798895,
+    "fixed_launcher_imu_hz": 250.27926427742688,
+    "fixed_source_gap_ms_p95": 4.03,
+    "source_profile": "scenarios/hitl-follow.jsonc",
+    "detector": "yolov8m-neutron",
+    "controller_gains_changed": false,
+    "follow_seconds": 61.0,
+    "normal_arming": true,
+    "maximum_hover_error_m": 0.32978415421448193,
+    "identity_loss_hold_passed": true,
+    "landed": true,
+    "disarmed": true,
+    "first_straight_heading_peak_to_peak_deg": {
+      "before": 22.822449636470267,
+      "after": 11.764850400191861
+    },
+    "second_straight_heading_peak_to_peak_deg": {
+      "before": 53.57595947930142,
+      "after": 15.07065574721765
+    },
+    "comparison_scope": "Two runs of the same profile; 2-17 s and 29-41 s after timed following starts",
+    "remaining": "Residual yaw oscillation remains; smoothness and 40 mph following have not passed",
+    "preflight": "Network HITL now requires at least 200 Hz IMU cadence for its 250 Hz profiles",
+    "full_rate_setpoints_recorded": true,
+    "recordings_are_local": true
   }
 }

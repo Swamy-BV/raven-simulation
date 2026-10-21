@@ -21,6 +21,7 @@ def main():
     link = mavutil.mavlink_connection("tcp:" + args.board + ":5760",
                                       source_system=246, source_component=191)
     counts = {"HIL_SENSOR": 0, "HIL_GPS": 0, "HIL_ACTUATOR_CONTROLS": 0}
+    imu_times = []
     heartbeat = None
     hitl_parameter = None
     try:
@@ -37,6 +38,8 @@ def main():
             kind = message.get_type()
             if kind in ("HIL_SENSOR", "HIL_GPS"):
                 counts[kind] += 1
+            if kind == "HIL_SENSOR" and (not imu_times or message.time_usec > imu_times[-1]):
+                imu_times.append(message.time_usec)
             if message.get_srcSystem() != 1 or message.get_srcComponent() != 1:
                 continue
             if kind == "HEARTBEAT":
@@ -59,6 +62,12 @@ def main():
             raise RuntimeError("Missing M7 HIL actuator output: " + str(counts))
         if not args.serial_hitl and (counts["HIL_SENSOR"] < 100 or counts["HIL_GPS"] < 10):
             raise RuntimeError("Incomplete AirSim/M7 HIL transport: " + str(counts))
+        imu_rate_hz = ((len(imu_times) - 1) * 1e6 / (imu_times[-1] - imu_times[0])
+                       if len(imu_times) > 1 else 0)
+        # These HITL profiles request 250 Hz. A packet-count-only check also
+        # accepts the Windows hidden-window failure at approximately 64 Hz.
+        if not args.serial_hitl and imu_rate_hz < 200:
+            raise RuntimeError(f"HITL IMU cadence too slow: {imu_rate_hz:.1f} Hz; expected about 250 Hz")
         def console(command):
             payload = (command + "\n").encode()
             link.mav.serial_control_send(
@@ -103,6 +112,7 @@ def main():
                     raise RuntimeError("Serial HIL sensor stopped: " + topic)
         print(json.dumps({"system_id": 1, "SYS_HITL": hitl_parameter,
                           "disarmed": True, "simulated_outputs_only": True,
+                          "network_imu_rate_hz": imu_rate_hz if not args.serial_hitl else None,
                           "sensor_transport": "serial" if args.serial_hitl else "network", "message_counts_8s": counts}), flush=True)
     finally:
         link.close()

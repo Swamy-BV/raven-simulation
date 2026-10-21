@@ -43,6 +43,7 @@ class HitlTests(unittest.TestCase):
         health_log = (output / "health.jsonl").open("w")
         attitude_log = (output / "attitude.jsonl").open("w")
         observation_log = (output / "observation-health.jsonl").open("w")
+        setpoint_log = (output / "setpoints.jsonl").open("w")
         stream = False
         goal = None
         arm_requested = False
@@ -64,6 +65,16 @@ class HitlTests(unittest.TestCase):
         def receive(key, message):
             latest[key] = message
             seen[key] = time.monotonic()
+            if key == "setpoint":
+                nullable = lambda value: float(value) if math.isfinite(value) else None
+                setpoint_log.write(json.dumps({
+                    "received_ros_ns": node.get_clock().now().nanoseconds,
+                    "timestamp_us": message.timestamp,
+                    "position": [nullable(v) for v in message.position],
+                    "velocity": [nullable(v) for v in message.velocity],
+                    "acceleration": [nullable(v) for v in message.acceleration],
+                    "yaw": nullable(message.yaw),
+                    "yawspeed": nullable(message.yawspeed)}) + "\n")
             if key == "attitude":
                 attitude_log.write(json.dumps({"source_ns": message.timestamp_sample * 1000,
                                                "q": [float(v) for v in message.q]}) + "\n")
@@ -140,6 +151,9 @@ class HitlTests(unittest.TestCase):
             targets.publish(target)
 
         timer = node.create_timer(.05, publish)
+        subs.append(node.create_subscription(
+            TrajectorySetpoint, "/fmu/in/trajectory_setpoint",
+            lambda m: receive("setpoint", m), qos_profile_sensor_data))
 
         def wait(predicate, seconds, label):
             end = time.monotonic() + seconds
@@ -382,6 +396,7 @@ class HitlTests(unittest.TestCase):
             health_log.close()
             attitude_log.close()
             observation_log.close()
+            setpoint_log.close()
             node.destroy_timer(timer)
             node.destroy_node()
             rclpy.shutdown()
