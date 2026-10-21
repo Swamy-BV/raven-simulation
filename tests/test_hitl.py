@@ -42,6 +42,7 @@ class HitlTests(unittest.TestCase):
         track_log = (output / "tracks.jsonl").open("w")
         health_log = (output / "health.jsonl").open("w")
         attitude_log = (output / "attitude.jsonl").open("w")
+        observation_log = (output / "observation-health.jsonl").open("w")
         stream = False
         goal = None
         arm_requested = False
@@ -72,6 +73,14 @@ class HitlTests(unittest.TestCase):
                 health_log.write(json.dumps({
                     "ros_ns": node.get_clock().now().nanoseconds,
                     "health": {v.key: v.value for v in message.status[0].values}}) + "\n")
+            if key == "observation_health" and message.status:
+                diagnostic = message.status[0]
+                observation_log.write(json.dumps({
+                    "source_ns": message.header.stamp.sec * 10**9 + message.header.stamp.nanosec,
+                    "received_ros_ns": node.get_clock().now().nanoseconds,
+                    "level": diagnostic.level[0] if isinstance(diagnostic.level, bytes) else int(diagnostic.level),
+                    "reason": diagnostic.message,
+                    "values": {v.key: v.value for v in diagnostic.values}}) + "\n")
             if key == "tracks":
                 track_log.write(json.dumps({
                     "source_ns": message.header.stamp.sec * 10**9 + message.header.stamp.nanosec,
@@ -100,6 +109,9 @@ class HitlTests(unittest.TestCase):
             subs.append(node.create_subscription(
                 DiagnosticArray, guidance + "/health",
                 lambda m: receive("health", m), 10))
+            subs.append(node.create_subscription(
+                DiagnosticArray, guidance + "/observation_health",
+                lambda m: receive("observation_health", m), qos_profile_sensor_data))
             subs.append(node.create_subscription(
                 Detection2DArray, "/raven/vehicle_1/perception/tracks",
                 lambda m: receive("tracks", m), 10))
@@ -369,6 +381,7 @@ class HitlTests(unittest.TestCase):
             track_log.close()
             health_log.close()
             attitude_log.close()
+            observation_log.close()
             node.destroy_timer(timer)
             node.destroy_node()
             rclpy.shutdown()
