@@ -41,7 +41,7 @@
     "changes_committed": false,
     "changes_pushed": false
   },
-  "next_step": "Tune turn anticipation and smoothness against the saved passing baseline; retain selected-identity and stale-input stops.",
+  "next_step": "Fix selected visual identity continuity through bends using the saved detection and association evidence; preserve the validated HITL yaw settings and rerun the unchanged 61-second racetrack gate.",
   "experimental_wifi_relay_retained_in_source": false,
   "direct_usb_serial_experiment": {
     "target": "raven_frdm_hitl-serial",
@@ -319,6 +319,147 @@
       "router_override_removed": true,
       "simulator_stopped": true,
       "pushed": false
+    }
+  },
+  "yaw_damping_improvement": {
+    "controller": "actual i.MX95 Cortex-M7 PX4 HITL; system 1 /fmu",
+    "method": "Sequential live-parameter comparisons using unchanged deterministic hover, straight and circular trajectories; then the unchanged three-car racetrack",
+    "trials": [
+      {
+        "gains": {
+          "MC_YAW_P": 2.8,
+          "MC_YAWRATE_P": 0.2,
+          "MC_YAWRATE_I": 0.1
+        },
+        "first_step_overshoot_deg": 13.12513042226824,
+        "first_step_overshoot_percent": 65.62565211134118,
+        "first_step_settling_within_2deg_seconds": null,
+        "coordinated_circle_heading_error_p95_deg": 1.292585819985591,
+        "fixed_heading_circle_error_p95_deg": 1.3946144355407462,
+        "normal_arming_landing_disarm_passed": true,
+        "motor_near_max_fraction": 0.0
+      },
+      {
+        "gains": {
+          "MC_YAW_P": 1,
+          "MC_YAWRATE_P": 0.2,
+          "MC_YAWRATE_I": 0.1
+        },
+        "first_step_overshoot_deg": 5.612790220199745,
+        "first_step_overshoot_percent": 28.063951100998718,
+        "first_step_settling_within_2deg_seconds": 6.393174,
+        "coordinated_circle_heading_error_p95_deg": 2.6879519330732204,
+        "fixed_heading_circle_error_p95_deg": 3.431697857784665,
+        "normal_arming_landing_disarm_passed": true,
+        "motor_near_max_fraction": 0.0
+      },
+      {
+        "gains": {
+          "MC_YAW_P": 1,
+          "MC_YAWRATE_P": 0.2,
+          "MC_YAWRATE_I": 0.02
+        },
+        "first_step_overshoot_deg": 4.0004161344285825,
+        "first_step_overshoot_percent": 20.00208067214291,
+        "first_step_settling_within_2deg_seconds": 4.420954,
+        "coordinated_circle_heading_error_p95_deg": 2.940084097909047,
+        "fixed_heading_circle_error_p95_deg": 3.907845844879608,
+        "normal_arming_landing_disarm_passed": true,
+        "motor_near_max_fraction": 0.0
+      },
+      {
+        "gains": {
+          "MC_YAW_P": 1,
+          "MC_YAWRATE_P": 0.4,
+          "MC_YAWRATE_I": 0.02
+        },
+        "first_step_overshoot_deg": 0.7208937253197067,
+        "first_step_overshoot_percent": 3.604468626598533,
+        "first_step_settling_within_2deg_seconds": 1.77051,
+        "coordinated_circle_heading_error_p95_deg": 2.1974786374215465,
+        "fixed_heading_circle_error_p95_deg": 3.335163602473204,
+        "normal_arming_landing_disarm_passed": true,
+        "motor_near_max_fraction": 0.0
+      }
+    ],
+    "selected_settings": {
+      "MC_YAW_P": 1,
+      "MC_YAWRATE_P": 0.4,
+      "MC_YAWRATE_I": 0.02
+    },
+    "all_three_step_overshoots_percent": [
+      3.604468626598533,
+      3.640181952051506,
+      3.830136560140468
+    ],
+    "all_three_step_settling_seconds": [
+      1.77051,
+      1.948825,
+      1.754072
+    ],
+    "step_overshoot_below_10_percent_and_settling_below_3_seconds_passed": true,
+    "coordinated_circle_below_3deg_p95_passed": true,
+    "fixed_heading_circle_below_3deg_p95_passed": false,
+    "fixed_heading_circle_limit_note": "3.34 degrees p95 versus the proposed 3 degree target; do not report all isolated targets as passed",
+    "racetrack_heading_comparison": [
+      {
+        "label": "Baseline",
+        "window_s": [
+          18,
+          22
+        ],
+        "yaw_error_p95_deg": 18.277260338056184,
+        "actual_heading_peak_to_peak_deg": 43.596739478118685
+      },
+      {
+        "label": "Damped",
+        "window_s": [
+          18,
+          22
+        ],
+        "yaw_error_p95_deg": 0.3700037911094011,
+        "actual_heading_peak_to_peak_deg": 1.4796542804505641
+      }
+    ],
+    "racetrack_full_following_passed": false,
+    "racetrack_seconds_to_last_selected_observation": 23.740970837,
+    "remaining_failure": "Selected car remains visible and detected, but its track ID changes from suffix :1 to :5 during the bend. Guidance correctly latches hold and lands.",
+    "selection_or_timeout_checks_weakened": false,
+    "perception_or_guidance_code_changed": false,
+    "normal_arming_and_failure_landing_disarm_passed": true,
+    "firmware": {
+      "commit": "c6903a6705",
+      "target": "raven_frdm_hitl",
+      "image_size": 1361640,
+      "binary_sha256": "3070d643633ef1fbb3deb04632f17755331903758819f96a701a476e86d3450c",
+      "build_passed": true,
+      "startup_gains_present_in_romfs": true,
+      "startup_packaging_fix": "Use rc.hitl_apps for the shared extra file so its generated stamp differs from init/rc.hitl",
+      "new_binary_flashed": false,
+      "live_parameters_tested": true
+    },
+    "final_state": {
+      "m7_disarmed": true,
+      "selected_yaw_settings_retained_on_hitl_board": true,
+      "unrelated_temporary_parameters_restored": true,
+      "normal_linux_services_restored": true,
+      "router_override_removed": true,
+      "simulator_stopped": true,
+      "pushed": false
+    },
+    "next_scope": {
+      "title": "Preserve selected visual identity through racetrack bends",
+      "work": [
+        "Compare raw detections with ByteTrack associations around the saved :1 to :5 transition.",
+        "Check observation cadence, box prediction and camera ego-motion before choosing the association change.",
+        "Validate with multiple similar cars; retain explicit target selection and the existing latched hold.",
+        "Rerun the full 61-second 40 mph cruise gate with the validated yaw settings."
+      ],
+      "not_in_scope": [
+        "Automatically adopting another car ID",
+        "Weakening freshness or identity checks",
+        "Additional yaw gain tuning without new evidence"
+      ]
     }
   }
 }
