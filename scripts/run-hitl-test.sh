@@ -5,7 +5,7 @@ set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 board=${1:?Provide board IPv4 address}
 case_name=${2:-hover}
-case "$case_name" in hover|follow) ;; *) echo 'Choose hover or follow' >&2; exit 2;; esac
+case "$case_name" in hover|follow|yaw) ;; *) echo 'Choose hover, follow or yaw' >&2; exit 2;; esac
 run_dir=${RAVEN_SIM_RUN_DIR:-}
 if [ -n "$run_dir" ] && { [ "$case_name" != follow ] || [ ! -f "$run_dir/config/bindings.json" ]; }; then
   echo 'RAVEN_SIM_RUN_DIR must name the active follow bridge run directory' >&2
@@ -42,6 +42,7 @@ CONFIG
 fi
 python3 "$root/tests/hitl_preflight.py" "$board"
 ssh "${args[@]}" root@"$board" 'mkdir -p /run/raven-hitl/tests; cat > /run/raven-hitl/tests/test_hitl.py' < "$root/tests/test_hitl.py"
+ssh "${args[@]}" root@"$board" 'cat > /run/raven-hitl/tests/yaw_profile.py' < "$root/tests/yaw_profile.py"
 ssh "${args[@]}" root@"$board" /bin/sh -s -- "$case_name" "$runtime" "$height" "$cruise" <<'REMOTE' | mirror_output
 set -e
 cd /run/raven-hitl/tests

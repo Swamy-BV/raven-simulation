@@ -246,5 +246,79 @@
       "simulator_stopped": true,
       "changes_pushed": false
     }
+  },
+  "isolated_yaw_response_validation": {
+    "controller": "physical Cortex-M7 PX4 HITL, system 1 /fmu",
+    "diagnostic_sequence_completed": true,
+    "good_step_response_passed": false,
+    "normal_arming": true,
+    "hover_height_m": 4.5,
+    "maximum_hover_error_m": 0.29972653339700406,
+    "landed": true,
+    "disarmed": true,
+    "imu_preflight_hz": 249.68520534513885,
+    "vision_used_for_control": false,
+    "ground_truth_used_for_control": false,
+    "yaw_gains_changed": false,
+    "simulator_physics_changed": false,
+    "yaw_gains": {
+      "MC_YAW_P": 2.8,
+      "MC_YAWRATE_P": 0.2,
+      "MC_YAWRATE_I": 0.1,
+      "MC_YAWRATE_D": 0,
+      "MC_YAWRATE_FF": 0,
+      "MC_YAW_TQ_CUTOFF": 2
+    },
+    "first_20_degree_step": {
+      "overshoot_degrees": 13.12513042226824,
+      "overshoot_percent": 65.62565211134118,
+      "settling_time_within_2deg_s": null,
+      "truth_yaw_error_rms_deg": 8.554269101050824
+    },
+    "smooth_circle_18_mps_radius_80_m": {
+      "fixed_heading_error_p95_deg": 1.3946144355407462,
+      "tangent_heading_error_p95_deg": 1.292585819985591,
+      "tangent_heading_error_max_deg": 1.8787561160720299,
+      "tangent_truth_heading_error_rms_deg": 3.145665468696686,
+      "tangent_path_error_p95_m": 3.3810801886375725
+    },
+    "maximum_motor_output_during_40_degree_reversal": 0.9013104438781738,
+    "motor_near_max_output_fraction": 0.0,
+    "observed_conclusion": "Abrupt heading changes excite underdamped yaw response even without perception. Smooth fixed-heading and tangent-heading circles did not reproduce the large race-tracking wobble. AirSim pose corroborates the step ringing.",
+    "limits": "One diagnostic flight with sequential phases; not a flight-gain validation for physical hardware. Smooth circles still show path lag and a few degrees of estimator-to-truth heading offset.",
+    "next_scope": {
+      "title": "Improve HITL yaw damping before changing the target predictor or planner",
+      "implementation_location": "Simulator/HITL test configuration first; no permanent physical-aircraft gain changes",
+      "work": [
+        "Use recorded heading, body rate, motor output and simulator inertia/torque settings to identify yaw-loop response.",
+        "Compare one bounded yaw-gain or filter change at a time against the unchanged baseline using the same isolated sequence.",
+        "Select a well-damped response, then replay rapid bounded heading corrections representative of the racetrack before enabling vision feedback.",
+        "If required, add a yaw-reference generator in Guidance with explicit rate and acceleration limits; keep yaw and yaw-rate feed-forward consistent.",
+        "Repeat selected-identity racetrack following at 15, 25 and 40 mph with the existing target-loss hold and landing gates."
+      ],
+      "proposed_acceptance": {
+        "isolated_20_degree_step_overshoot_percent_max": 10,
+        "isolated_20_degree_step_settling_within_2deg_seconds_max": 3,
+        "smooth_circle_heading_error_p95_deg_max": 3,
+        "motor_clipping_allowed": false,
+        "normal_arming_landing_disarm_required": true,
+        "final_racetrack_cruise_seconds_required": 61
+      },
+      "not_in_scope": [
+        "New production service",
+        "MPC integration",
+        "Target-estimator rewrite",
+        "Permanent real-aircraft gain tuning",
+        "Weakening target identity or timeout gates"
+      ]
+    },
+    "final_state": {
+      "temporary_test_parameters_restored": true,
+      "m7_disarmed": true,
+      "normal_board_services_active": true,
+      "router_override_removed": true,
+      "simulator_stopped": true,
+      "pushed": false
+    }
   }
 }

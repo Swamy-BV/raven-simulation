@@ -17,12 +17,16 @@ class HitlTests(unittest.TestCase):
     def test_follow_and_land(self):
         self.run_flight(True)
 
-    def run_flight(self, following):
+    def test_yaw_and_land(self):
+        self.run_flight(False, yaw_response=True)
+
+    def run_flight(self, following, yaw_response=False):
         import rclpy
         from rclpy.qos import qos_profile_sensor_data
         from px4_msgs.msg import (VehicleStatus, VehicleLocalPosition,
                                   VehicleLandDetected, VehicleCommandAck,
-                                  VehicleCommand, OffboardControlMode, TrajectorySetpoint, VehicleAttitude)
+                                  VehicleCommand, OffboardControlMode, TrajectorySetpoint, VehicleAttitude,
+                                  VehicleOdometry)
 
         from diagnostic_msgs.msg import DiagnosticArray
         from vision_msgs.msg import Detection2DArray
@@ -44,6 +48,9 @@ class HitlTests(unittest.TestCase):
         attitude_log = (output / "attitude.jsonl").open("w")
         observation_log = (output / "observation-health.jsonl").open("w")
         setpoint_log = (output / "setpoints.jsonl").open("w")
+        yaw_log = (output / "yaw-response.jsonl").open("w")
+        yaw_reference = None
+        yaw_phases = []
         stream = False
         goal = None
         arm_requested = False
@@ -78,6 +85,12 @@ class HitlTests(unittest.TestCase):
             if key == "attitude":
                 attitude_log.write(json.dumps({"source_ns": message.timestamp_sample * 1000,
                                                "q": [float(v) for v in message.q]}) + "\n")
+            if key == "odometry":
+                yaw_log.write(json.dumps({"kind": "odometry",
+                    "received_ros_ns": node.get_clock().now().nanoseconds,
+                    "source_ns": message.timestamp_sample * 1000,
+                    "q": [float(v) for v in message.q],
+                    "angular_velocity": [float(v) for v in message.angular_velocity]}) + "\n")
             if key == "ack":
                 acks.append(message)
             if key == "health" and message.status:
@@ -116,6 +129,10 @@ class HitlTests(unittest.TestCase):
             subs.append(node.create_subscription(
                 cls, "/fmu/out/" + topic,
                 lambda m, key=key: receive(key, m), qos_profile_sensor_data))
+        if yaw_response:
+            subs.append(node.create_subscription(
+                VehicleOdometry, "/fmu/out/vehicle_odometry",
+                lambda m: receive("odometry", m), qos_profile_sensor_data))
         if following:
             subs.append(node.create_subscription(
                 DiagnosticArray, guidance + "/health",
@@ -148,6 +165,19 @@ class HitlTests(unittest.TestCase):
             target.jerk = [math.nan] * 3
             target.yaw = math.nan
             target.yawspeed = math.nan
+            if yaw_reference is not None:
+                phase, position, velocity, acceleration, yaw, rate = yaw_reference
+                moving = phase in ("straight_fixed_yaw", "circle_fixed_yaw", "circle_tangent_yaw")
+                target.position = [math.nan, math.nan, position[2]] if moving else position
+                target.velocity = [velocity[0], velocity[1], math.nan] if moving else velocity
+                target.acceleration = [acceleration[0], acceleration[1], math.nan] if moving else acceleration
+                target.yaw = math.atan2(math.sin(yaw), math.cos(yaw))
+                target.yawspeed = rate
+                yaw_log.write(json.dumps({"kind": "reference", "ros_ns": target.timestamp * 1000,
+                    "phase": phase, "expected_position_ned": position,
+                    "velocity_ned": velocity, "acceleration_ned": acceleration,
+                    "yaw": target.yaw, "yawspeed": rate,
+                    "xy_control": "velocity" if moving else "position"}) + "\n")
             targets.publish(target)
 
         timer = node.create_timer(.05, publish)
@@ -237,6 +267,9 @@ class HitlTests(unittest.TestCase):
                      15, "fresh real-time inference output before arming")
                 wait(lambda: health().get("px4_namespace") == "", 5,
                      "guidance addresses the real M7 namespace")
+            if yaw_response:
+                self.assertEqual(node.count_publishers("/fmu/in/trajectory_setpoint"), 1,
+                                 "Yaw diagnostic must be the only setpoint publisher before arming")
             status = latest["status"]
             self.assertEqual(status.system_id, 1)
             self.assertEqual(status.hil_state, VehicleStatus.HIL_STATE_ON)
@@ -273,6 +306,47 @@ class HitlTests(unittest.TestCase):
                 maximum_error = max(maximum_error, math.dist(goal, [p.x, p.y, p.z]))
                 self.assertLess(maximum_error, .75, "hover position error")
             hover_end_ros_ns = node.get_clock().now().nanoseconds
+            if yaw_response:
+                from yaw_profile import yaw_response_sample
+                wait(lambda: "odometry" in latest and time.monotonic() - seen["odometry"] < .25,
+                     10, "fresh M7 body rates for yaw diagnostic")
+                self.assertEqual(node.count_publishers("/fmu/in/trajectory_setpoint"), 1,
+                                 "Yaw diagnostic must be the only setpoint publisher")
+                q = latest["attitude"].q
+                heading = math.atan2(2 * (q[0] * q[3] + q[1] * q[2]),
+                                     1 - 2 * (q[2] * q[2] + q[3] * q[3]))
+                diagnostic_start = time.monotonic()
+                previous_phase = None
+                while True:
+                    yaw_reference = yaw_response_sample(time.monotonic() - diagnostic_start, goal, heading)
+                    if yaw_reference is None:
+                        break
+                    phase, expected, _, _, expected_yaw, _ = yaw_reference
+                    if phase != previous_phase:
+                        entry = {"phase": phase, "ros_ns": node.get_clock().now().nanoseconds}
+                        yaw_phases.append(entry)
+                        print("YAW_PHASE", json.dumps(entry), flush=True)
+                        previous_phase = phase
+                    rclpy.spin_once(node, timeout_sec=.02)
+                    self.assertTrue(fresh(), "M7 telemetry expired")
+                    self.assertLess(time.monotonic() - seen["attitude"], .25)
+                    self.assertLess(time.monotonic() - seen["odometry"], .25)
+                    self.assertEqual(latest["status"].hil_state, VehicleStatus.HIL_STATE_ON)
+                    self.assertEqual(latest["status"].nav_state, VehicleStatus.NAVIGATION_STATE_OFFBOARD)
+                    self.assertFalse(latest["status"].failsafe)
+                    p = latest["position"]
+                    self.assertLess(abs(p.z - goal[2]), 1.5, "yaw diagnostic altitude envelope")
+                    self.assertLess(math.dist(expected[:2], [p.x, p.y]), 8,
+                                    "yaw diagnostic path error envelope")
+                    q = latest["attitude"].q
+                    measured_yaw = math.atan2(2 * (q[0] * q[3] + q[1] * q[2]),
+                                              1 - 2 * (q[2] * q[2] + q[3] * q[3]))
+                    difference = measured_yaw - expected_yaw
+                    self.assertLess(abs(math.atan2(math.sin(difference), math.cos(difference))),
+                                    math.radians(60), "yaw diagnostic heading envelope")
+                p = latest["position"]
+                goal = [float(p.x), float(p.y), goal[2]]
+                print("PASS yaw diagnostic sequence completed; response metrics require offline analysis", flush=True)
             if following:
                 # Acquire identity at the operating viewpoint. Ground-level
                 # detections before takeoff do not define the selected object.
@@ -363,12 +437,15 @@ class HitlTests(unittest.TestCase):
                       "normal_arming": True, "landed": True, "disarmed": True,
                       "hover_start_ros_ns": hover_start_ros_ns,
                       "hover_end_ros_ns": hover_end_ros_ns,
-                      "origin_ned": origin, "hover_goal_ned": goal,
+                      "origin_ned": origin,
+                      "hover_goal_ned": [origin[0], origin[1], origin[2] - height_m],
+                      "final_hold_goal_ned": goal,
                       "selected_track": selected,
                       "following_seconds": recording_seconds if following else 0,
                       "following_ready_ros_ns": follow_ready_ros_ns,
                       "following_start_ros_ns": follow_start_ros_ns,
-                      "following_end_ros_ns": follow_end_ros_ns}
+                      "following_end_ros_ns": follow_end_ros_ns,
+                      "yaw_diagnostic_completed": yaw_response, "yaw_phases": yaw_phases}
             (output / "result.json").write_text(json.dumps(result, indent=2) + "\n")
             print("RESULT", json.dumps(result), flush=True)
         except Exception as error:
@@ -397,6 +474,7 @@ class HitlTests(unittest.TestCase):
             attitude_log.close()
             observation_log.close()
             setpoint_log.close()
+            yaw_log.close()
             node.destroy_timer(timer)
             node.destroy_node()
             rclpy.shutdown()
