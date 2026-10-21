@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "scene_id": "PanoramaOverview",
+  "aircraft": {
+    "name": "CameraDrone",
+    "xyz": "2 -34 -4",
+    "rpy_deg": "0 0 90"
+  },
+  "camera": {
+    "pitch_down_deg": 0,
+    "horizontal_fov_deg": 80.2140913183,
+    "stabilized": true
+  }
+}

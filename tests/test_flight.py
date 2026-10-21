@@ -2,6 +2,7 @@
 """Run explicitly on the Raven board after starting the isolated AirSim/PX4 session."""
 
 import os
+import math
 import unittest
 
 
@@ -32,6 +33,28 @@ class FlightTests(unittest.TestCase):
 
     def test_follow(self):
         self.session.run_follow()
+
+    def test_turn(self):
+        self.session.run_follow(40.0)
+
+    def test_drive(self):
+        from rcl_interfaces.srv import GetParameters
+        request = GetParameters.Request()
+        request.names = ["max_speed", "max_acceleration", "camera_stabilized",
+                         "minimum_heading_speed"]
+        reply = self.session.service(self.session.parameters, request)
+        self.assertAlmostEqual(reply.values[0].double_value, 8.0)
+        self.assertAlmostEqual(reply.values[1].double_value, 3.0)
+        self.assertTrue(reply.values[2].bool_value)
+        self.assertAlmostEqual(reply.values[3].double_value, 1.0)
+        self.session.run_follow(
+            40.0, selection_after_sim_seconds=55.0,
+            recording_after_sim_seconds=65.0,
+            braking_acceleration_mps2=3.0,
+        )
+        peak = max(math.hypot(*s["velocity_ned"][:2])
+                   for s in self.session.samples)
+        self.assertGreater(peak, 4.0, "Aircraft did not reach driving speed")
 
     def test_traffic(self):
         from rcl_interfaces.srv import GetParameters

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "rtp_time.h"
 
-#include <gst/rtp/gstrtphdrext.h>
-
 #include <stdexcept>
+
+#include <gst/rtp/gstrtphdrext.h>
 
 namespace {
 constexpr guint64 kNtpUnixOffset = 2208988800ULL * GST_SECOND;
@@ -31,10 +31,12 @@ gssize Write(GstRTPHeaderExtension*, const GstBuffer* input,
   const auto* meta = gst_buffer_get_reference_timestamp_meta(
       const_cast<GstBuffer*>(input), caps);
   gst_caps_unref(caps);
-  if (!meta || size < 8) return 0;
+  if (!meta || size < 8) {
+    return 0;
+  }
   const auto ntp =
       gst_util_uint64_scale(meta->timestamp, 1ULL << 32, GST_SECOND);
-  return gst_rtp_hdrext_set_ntp_64(data, size, ntp) ? 8 : -1;
+  return gst_rtp_hdrext_set_ntp_64(data, 8, ntp) ? 8 : -1;
 }
 
 void capture_time_extension_class_init(CaptureTimeExtensionClass* klass) {
@@ -58,22 +60,26 @@ void ConfigureCaptureTime(GstElement* payloader) {
   // adapter supplies the same standard extension on
   // Ubuntu 22.04/GStreamer 1.20.
   auto* extension = gst_element_factory_make("rtphdrextntp64", nullptr);
-  if (!extension)
+  if (!extension) {
     extension =
         GST_ELEMENT(g_object_new(capture_time_extension_get_type(), nullptr));
+  }
   gst_rtp_header_extension_set_id(GST_RTP_HEADER_EXTENSION(extension), 1);
   g_signal_emit_by_name(payloader, "add-extension", extension);
   gst_object_unref(extension);
 }
 
 void AttachCaptureTime(GstBuffer* buffer, std::int64_t source_ns) {
-  if (source_ns <= 0)
+  if (source_ns <= 0) {
     throw std::runtime_error("Invalid camera acquisition time");
+  }
   auto* caps = gst_caps_new_empty_simple("timestamp/x-ntp");
   const auto* meta = gst_buffer_add_reference_timestamp_meta(
       buffer, caps, kNtpUnixOffset + static_cast<guint64>(source_ns),
       GST_CLOCK_TIME_NONE);
   gst_caps_unref(caps);
-  if (!meta) throw std::runtime_error("Cannot attach camera acquisition time");
+  if (!meta) {
+    throw std::runtime_error("Cannot attach camera acquisition time");
+  }
 }
 }  // namespace raven::simulation

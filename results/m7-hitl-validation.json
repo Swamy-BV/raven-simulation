@@ -1,0 +1,180 @@
+{
+  "controller": "physical i.MX95 Cortex-M7 / raven_frdm_hitl",
+  "physics": "Windows ProjectAirSim 1.0.1 real-time",
+  "commands": "ROS 2 DDS over RPMsg, system 1 /fmu",
+  "sitl_running": false,
+  "passed": true,
+  "verified": [
+    "standalone M7 HITL build and boot",
+    "simulated motor output; physical PWM backend excluded",
+    "250 Hz HIL_SENSOR and 10 Hz HIL_GPS transport",
+    "normal arming via DDS",
+    "router partial UART write regression: 64 frames byte-for-byte under short write/EAGAIN/EINTR",
+    "Ethernet HIL sensor delivery: 250 Hz IMU and 10 Hz GPS",
+    "actual M7 controlled takeoff to 4.5 m and 10-second hover, passed twice",
+    "actual AirSim pose independently confirms hover within 0.75 m",
+    "automatic landing and disarm, passed twice without manual cleanup",
+    "identity reset latches hold, brakes and remains on the selected identity",
+    "following run lands and disarms automatically",
+    "61.005 seconds of moving-car following at requested 5 m/s through two corners with NPU YOLOv8m; stationary acquisition excluded"
+  ],
+  "not_passed": [
+    "Tight rear formation and smooth image centering through corners remain unvalidated",
+    "Relative-velocity yaw feed-forward comparison lost the selected track at the second corner; experiment removed"
+  ],
+  "recovery": "The validated hover and following runs landed and disarmed automatically.",
+  "wifi_udp_timing": {
+    "samples": 1998,
+    "receive_gap_ms": {
+      "median": 3.948787,
+      "p95": 7.880532,
+      "max": 75.333605
+    },
+    "arrival_jitter_span_ms": 72.017467,
+    "transport": "Wi-Fi UDP via local PC MAVLink Router, no board video, HIL-only filters"
+  },
+  "final_state": {
+    "m7_disarmed": true,
+    "hitl_firmware_installed": true,
+    "router_runtime_override_removed": true,
+    "simulator_stopped": true,
+    "changes_committed": false,
+    "changes_pushed": false
+  },
+  "next_step": "Tune turn anticipation and smoothness against the saved passing baseline; retain selected-identity and stale-input stops.",
+  "experimental_wifi_relay_retained_in_source": false,
+  "direct_usb_serial_experiment": {
+    "target": "raven_frdm_hitl-serial",
+    "baud": 921600,
+    "sensor_path": "Windows AirSim -> onboard USB UART -> M7 UART3; no Wi-Fi or Linux forwarding",
+    "command_path": "A55 ROS 2 DDS over RPMsg -> physical M7",
+    "preflight_passed": true,
+    "normal_arming_passed": true,
+    "sensor_ages_at_one_disarmed_snapshot_ms": {
+      "imu": 1.645,
+      "gps": 91.573
+    },
+    "ages_are_since_M7_publication_not_end_to_end_latency": true,
+    "HIL_ACTUATOR_CONTROLS_messages_in_8s": 1311,
+    "hover_passed": false,
+    "automatic_landing_passed": false,
+    "failure": "Actual simulated aircraft became unstable; did not reach the 4.5 m hover gate. Normal landing cleanup did not disarm.",
+    "max_observed_height_above_spawn_m": 1.787025,
+    "recovery": "Restored the verified previous boot container and rebooted; UART3 debug console and disarmed M7 verified.",
+    "console_note": "Headless NSH must remain alive: exiting the initial task destroys C++ runtime parameter defaults. Experimental firmware blocks NSH input on the existing RPMsg nsh device and logs console output in RAM.",
+    "changes_committed": false,
+    "changes_pushed": false
+  },
+  "initial_ethernet_attempt": {
+    "link_mbps": 1000,
+    "full_duplex": true,
+    "board_address_is_runtime_only": true,
+    "preflight_passed": true,
+    "normal_arming_passed": true,
+    "hover_passed": false,
+    "automatic_landing_passed": false,
+    "network_timing": {
+      "transport": "Ethernet TCP AirSim to board eth0, kernel ingress timestamps",
+      "samples": 2000,
+      "receive_gap_ms": {
+        "median": 3.999477,
+        "p95": 4.049434,
+        "max": 4.522957
+      },
+      "arrival_jitter_span_ms": 0.865873
+    },
+    "M7_IMU_timing_via_onboard_DDS": {
+      "samples": 1838,
+      "M7_timestamp_gap_ms": {
+        "median": 4.002,
+        "p95": 4.225,
+        "max": 10.163
+      },
+      "Linux_receipt_gap_ms": {
+        "median": 3.90675,
+        "p95": 5.546115,
+        "max": 10.820824
+      },
+      "M7_gyro_integration_us": {
+        "median": 4002,
+        "p95": 4221,
+        "max": 7042
+      }
+    },
+    "recovery": "Normal landing cleanup failed after virtual crash; manually force-disarmed simulated-only M7, stopped AirSim and restored normal router service. No physical PWM backend exists in this firmware.",
+    "changes_committed": false,
+    "changes_pushed": false
+  },
+  "scope": "Physical M7 HITL hover, selected-car following on a street loop, identity-loss stop and landing",
+  "root_cause_and_fix": {
+    "cause": "HITL aircraft spawned beneath the Neighborhood Road_89 mesh. Repeated underside collision occurred about 1.79 m above the erroneous spawn and caused the vehicle to tip.",
+    "evidence": "Road_89 collision at Unreal z about 0.789 m matched the actual AirSim ascent limit; video frame showed the underside of the world.",
+    "old_spawn_ned_m": [
+      2,
+      -18,
+      1
+    ],
+    "corrected_spawn_ned_m": [
+      2,
+      -18,
+      -1.2
+    ],
+    "corrected_height_source": "Measured chassis-center pose after landing on the road upper surface, approximately z=-1.194 m NED.",
+    "change": "HITL scenario spawn only; original M7 HIL firmware, gains, motor mapping and serial bandwidth unchanged in both passing runs.",
+    "diagnostic_bandwidth_override_retained": false
+  },
+  "validated_runs": [
+    {
+      "passed": true,
+      "height_m": 4.5,
+      "hover_seconds": 10,
+      "maximum_px4_hover_error_m": 0.2998915326516459,
+      "maximum_actual_hover_error_m": 0.43187301689121554,
+      "maximum_actual_height_above_spawn_m": 4.545305132865906,
+      "normal_arming": true,
+      "landed": true,
+      "disarmed": true
+    },
+    {
+      "passed": true,
+      "height_m": 4.5,
+      "hover_seconds": 10,
+      "maximum_px4_hover_error_m": 0.2978588722335528,
+      "maximum_actual_hover_error_m": 0.4363597102761731,
+      "maximum_actual_height_above_spawn_m": 4.5173728466033936,
+      "normal_arming": true,
+      "landed": true,
+      "disarmed": true
+    }
+  ],
+  "following_validation": {
+    "passed": true,
+    "actual_m7": true,
+    "following_seconds": 61.004877116,
+    "model": "yolov8m-neutron",
+    "car_path_m": 292.1035700409017,
+    "aircraft_path_m": 298.271147689325,
+    "car_speed_p50_mps": 4.78306229632525,
+    "car_speed_p95_mps": 5.381965886311794,
+    "selected_observations": 404,
+    "selected_visible_fraction": 0.9926289926289926,
+    "center_x_mean": 307.71887744771374,
+    "center_y_mean": 172.46140947436342,
+    "center_x_error_p95_pixels": 116.11009216308594,
+    "center_y_error_p95_pixels": 57.61327362060547,
+    "landed": true,
+    "disarmed": true,
+    "video_fps": 27.35634853701733,
+    "following_fraction": 1.0,
+    "stationary_lead_in_seconds": 5.058046356,
+    "requested_car_cruise_mps": 5.0,
+    "video_duration_seconds": 66.190267106,
+    "normal_arming": true,
+    "identity_loss_hold_passed": true,
+    "stationary_acquisition_included_in_following_seconds": false,
+    "not_physical_flight": true,
+    "source_ground_truth_used_for_control": false,
+    "yaw_control": "0.4-second damped bearing response with bounded heading-rate feed-forward",
+    "relative_velocity_yaw_experiment_retained": false
+  }
+}

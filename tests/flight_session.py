@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-import json, math, time, struct, zlib
+import json, math, time, struct, zlib, shutil, os
 from collections import OrderedDict
 from pathlib import Path
 from sensor_msgs.msg import Image, CameraInfo
+from rosgraph_msgs.msg import Clock
+from geometry_msgs.msg import PointStamped
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -12,6 +14,7 @@ from px4_msgs.msg import (
     VehicleCommand,
     VehicleCommandAck,
     VehicleStatus,
+    VehicleAttitude,
     VehicleLocalPosition,
     VehicleLandDetected,
 )
@@ -28,7 +31,13 @@ class FlightSession:
             raise ValueError("Hover yaw must be finite")
         self.hover_yaw_rad = hover_yaw_rad
         self.record_unselected = record_unselected
-        self.output_dir = Path("/tmp/raven-simulation-results") / time.strftime(
+        results_root = Path("/tmp/raven-simulation-results")
+        results_root.mkdir(parents=True, exist_ok=True)
+        self.capture_snapshots = os.environ.get("RAVEN_SIM_SNAPSHOTS") == "1"
+        reserve_mib = 512 if self.capture_snapshots else 128
+        if shutil.disk_usage(results_root).free < reserve_mib * 1024 * 1024:
+            raise RuntimeError(f"Need {reserve_mib} MiB free for flight evidence before arming")
+        self.output_dir = results_root / time.strftime(
             "%Y%m%dT%H%M%SZ", time.gmtime()
         )
         self.output_dir.mkdir(parents=True, exist_ok=False)
@@ -39,6 +48,7 @@ class FlightSession:
         self.status = None
         self.m7 = None
         self.position = None
+        self.latest_setpoint = None
         self.land = None
         self.tracks = None
         self.camera_info = None
@@ -47,6 +57,9 @@ class FlightSession:
         self.stream = False
         self.goal = None
         self.samples = []
+        self.last_clock = None
+        self.clock_delivery = {"updates": 0, "max_step_ms": 0.0,
+                               "max_wall_gap_ms": 0.0, "regressions": 0}
         self.m7_armed = False
         self.last_print = 0
         self.m7_seen = 0.0
@@ -54,6 +67,7 @@ class FlightSession:
         self.subs = []
         self.images = OrderedDict()
         self.selected = None
+        self.detector_model = None
         self.snapshot_time = 0
         self.snapshot_index = 0
         for cls, topic, callback in [
@@ -110,7 +124,7 @@ class FlightSession:
         self.subs.append(
             self.node.create_subscription(
                 DiagnosticArray,
-                "/raven/vehicle_1/autonomy/following_health",
+                "/raven/vehicle_1/autonomy/guidance/health",
                 self.on_health,
                 10,
             )
@@ -131,7 +145,7 @@ class FlightSession:
             qos_profile_sensor_data,
         )
         self.parameters = self.node.create_client(
-            GetParameters, "/raven/vehicle_1/autonomy/target_follower/get_parameters"
+            GetParameters, "/raven/vehicle_1/autonomy/guidance/get_parameters"
         )
         self.tracker_parameters = self.node.create_client(
             GetParameters, "/raven/vehicle_1/perception/target_tracker/get_parameters"
@@ -143,21 +157,69 @@ class FlightSession:
             CameraInfo, "/raven/vehicle_1/cameras/front/camera_info",
             self.on_camera_info, qos_profile_sensor_data))
         self.select = self.node.create_client(
-            SelectTarget, "/raven/vehicle_1/autonomy/select_target"
+            SelectTarget, "/raven/vehicle_1/autonomy/guidance/select_target"
         )
         self.enable = self.node.create_client(
-            SetBool, "/raven/vehicle_1/autonomy/set_following"
+            SetBool, "/raven/vehicle_1/autonomy/guidance/set_following"
         )
         self.reset = self.node.create_client(
             Trigger, "/raven/vehicle_1/perception/reset_tracking"
         )
+        self.subs.append(self.node.create_subscription(
+            VehicleAttitude, "/simulation/fmu/out/vehicle_attitude",
+            self.on_attitude, qos_profile_sensor_data))
+        for suffix in ("target_observation", "target_position"):
+            self.subs.append(self.node.create_subscription(
+                PointStamped, "/raven/vehicle_1/autonomy/guidance/" + suffix,
+                lambda m, kind=suffix: self.on_target_point(kind, m),
+                qos_profile_sensor_data))
+        self.subs.append(self.node.create_subscription(
+            TrajectorySetpoint, "/simulation/fmu/in/trajectory_setpoint",
+            self.on_setpoint, qos_profile_sensor_data))
+        self.subs.append(self.node.create_subscription(
+            Clock, "/clock", self.on_clock, qos_profile_sensor_data))
         self.timer = self.node.create_timer(0.05, self.publish_hold)
+
+    def on_clock(self, message):
+        stamp = message.clock.sec * 1000000000 + message.clock.nanosec
+        steady = time.monotonic_ns()
+        metrics = self.clock_delivery
+        if self.last_clock is not None:
+            previous_stamp, previous_steady = self.last_clock
+            metrics["max_step_ms"] = max(metrics["max_step_ms"],
+                                         (stamp - previous_stamp) / 1e6)
+            metrics["max_wall_gap_ms"] = max(metrics["max_wall_gap_ms"],
+                                             (steady - previous_steady) / 1e6)
+            metrics["regressions"] += int(stamp < previous_stamp)
+        metrics["updates"] += 1
+        self.last_clock = stamp, steady
+        self.raw_file.write(json.dumps({
+            "kind": "clock", "stamp_ns": stamp, "received_steady_ns": steady,
+        }) + "\n")
+
+    def on_setpoint(self, m):
+        self.latest_setpoint = m
+        self.raw_file.write(json.dumps({
+            "kind": "setpoint", "stamp_ns": m.timestamp * 1000,
+            "received_ns": self.node.get_clock().now().nanoseconds,
+            "received_steady_ns": time.monotonic_ns(),
+            "velocity_ned": [float(v) if math.isfinite(v) else None for v in m.velocity],
+            "acceleration_ned": [float(v) if math.isfinite(v) else None for v in m.acceleration],
+            "yaw": float(m.yaw) if math.isfinite(m.yaw) else None,
+        }) + "\n")
 
     def on_camera_info(self, message):
         self.camera_info = message
 
     def on_status(self, m):
         self.status = m
+        self.raw_file.write(json.dumps({
+            "kind": "status", "stamp_ns": m.timestamp * 1000,
+            "received_ns": self.node.get_clock().now().nanoseconds,
+            "received_steady_ns": time.monotonic_ns(),
+            "system_id": m.system_id, "arming_state": m.arming_state,
+            "nav_state": m.nav_state, "failsafe": m.failsafe,
+        }) + "\n")
 
     def on_m7(self, m):
         self.m7_seen = time.monotonic()
@@ -166,6 +228,29 @@ class FlightSession:
 
     def on_position(self, m):
         self.position = m
+        self.raw_file.write(json.dumps({
+            "kind": "position", "stamp_ns": m.timestamp_sample * 1000,
+            "received_ns": self.node.get_clock().now().nanoseconds,
+            "received_steady_ns": time.monotonic_ns(),
+            "acceleration_ned": [m.ax, m.ay, m.az],
+            "ned": [m.x, m.y, m.z], "velocity_ned": [m.vx, m.vy, m.vz],
+        }) + "\n")
+
+    def on_attitude(self, m):
+        self.raw_file.write(json.dumps({
+            "kind": "attitude", "stamp_ns": m.timestamp_sample * 1000,
+            "received_ns": self.node.get_clock().now().nanoseconds,
+            "received_steady_ns": time.monotonic_ns(),
+            "q": [float(value) for value in m.q],
+        }) + "\n")
+
+    def on_target_point(self, kind, m):
+        self.raw_file.write(json.dumps({
+            "kind": kind, "frame": m.header.frame_id,
+            "stamp_ns": m.header.stamp.sec * 1000000000 + m.header.stamp.nanosec,
+            "received_ns": self.node.get_clock().now().nanoseconds,
+            "point": [m.point.x, m.point.y, m.point.z],
+        }) + "\n")
 
     def on_land(self, m):
         self.land = m
@@ -183,6 +268,8 @@ class FlightSession:
     def on_tracks(self, m):
         self.tracks = m
         self.log_observations("tracks", m)
+        if not self.capture_snapshots:
+            return
         if (
             (not self.selected and not self.record_unselected)
             or self.position is None
@@ -259,6 +346,8 @@ class FlightSession:
             json.dumps(
                 {
                     "kind": kind,
+                    "received_ns": self.node.get_clock().now().nanoseconds,
+                    "received_steady_ns": time.monotonic_ns(),
                     "stamp_ns": m.header.stamp.sec * 1000000000
                     + m.header.stamp.nanosec,
                     "selected": self.selected,
@@ -290,6 +379,7 @@ class FlightSession:
             self.health["reason"] = s.message
             self.raw_file.write(json.dumps({
                 "kind": "following", "stamp_ns": self.node.get_clock().now().nanoseconds,
+                "received_steady_ns": time.monotonic_ns(),
                 "health": self.health,
                 "ned": [self.position.x,self.position.y,self.position.z] if self.position else None,
             }) + "\n")
@@ -397,6 +487,24 @@ class FlightSession:
         self.settled = time.monotonic()
         return False
 
+    def takeoff_to_hover(self, altitude_m=4.5):
+        self.wait(lambda: self.status and self.m7 and self.position and self.land
+                  and self.position.xy_valid and self.position.z_valid,
+                  25, "isolated SITL and M7 telemetry")
+        assert (self.status.system_id == 2 and self.m7.system_id == 1
+                and self.status.arming_state == 1 and self.land.landed)
+        self.goal = [float(self.position.x), float(self.position.y),
+                     float(self.position.z) - altitude_m]
+        self.stream = True
+        self.wait(lambda: self.count >= 50, 12, "20 Hz offboard warmup")
+        self.command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, [1, 6])
+        self.wait(lambda: self.status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD,
+                  8, "simulated offboard mode")
+        self.wait(lambda: self.status.pre_flight_checks_pass,
+                  20, "normal offboard preflight checks")
+        self.command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, [1, 0])
+        self.wait(self.hover_ready, 60, "settled simulated hover")
+
     def run_follow(self, duration_sim_seconds=25.0, *, altitude_m=4.5,
                    selection_after_sim_seconds=65.0,
                    recording_after_sim_seconds=0.0,
@@ -427,6 +535,11 @@ class FlightSession:
             and self.status.arming_state == 1
             and self.land.landed
         )
+        model_request = GetParameters.Request()
+        model_request.names = ["model"]
+        model_reply = self.service(self.vision_parameters, model_request)
+        self.detector_model = model_reply.values[0].string_value
+        print("DETECTOR_MODEL", self.detector_model, flush=True)
         request = SelectTarget.Request()
         request.track_id = "not-a-visible-track"
         assert not self.service(self.select, request).success
@@ -521,6 +634,7 @@ class FlightSession:
                 and not self.status.failsafe
             ), "unexpected flight-mode loss"
             assert not self.m7_armed
+            assert time.monotonic() - self.m7_seen < 2, "M7 telemetry expired"
             sample = {
                 "t": round(time.monotonic() - start, 3),
                 "ned": [self.position.x, self.position.y, self.position.z],
@@ -564,10 +678,19 @@ class FlightSession:
         stopping_distance = 0.0
         stopping_seconds = 0.0
         if braking_acceleration_mps2 is not None:
-            self.wait(
-                lambda: self.health.get("braking") == "false"
-                and math.hypot(self.position.vx, self.position.vy) < 0.5,
-                30, "settled braking hold")
+            # Observe the controller output directly; the 1 Hz diagnostics
+            # report can arrive almost a second after braking has completed.
+            def position_hold_ready():
+                setpoint = self.latest_setpoint
+                return (
+                    setpoint is not None
+                    and setpoint.timestamp * 1000 >= brake_start
+                    and all(math.isfinite(v) for v in setpoint.position[:2])
+                    and all(math.isnan(v) for v in setpoint.velocity[:2])
+                    and math.hypot(self.position.vx, self.position.vy) < 0.5
+                )
+
+            self.wait(position_hold_ready, 30, "settled braking hold")
             stopping_seconds = (self.node.get_clock().now().nanoseconds
                                 - brake_start) / 1e9
             stopping_distance = math.dist(
@@ -605,9 +728,12 @@ class FlightSession:
         )
         assert not self.m7_armed
         report = {
+            "detector_model": self.detector_model,
+            "clock_delivery": dict(self.clock_delivery),
             "selected_id": selected,
             "following_seconds": duration,
             "following_sim_seconds": duration_sim,
+            "required_following_sim_seconds": duration_sim_seconds,
             "horizontal_displacement_m": displacement,
             "hold_drift_m": drift,
             "stopping_distance_m": stopping_distance,

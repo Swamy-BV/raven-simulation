@@ -14,34 +14,64 @@
 
 namespace raven::simulation {
 Video::Video(const std::string& host, const std::filesystem::path& directory,
-             std::function<void(std::int64_t)> source_clock)
+             std::function<void(std::int64_t)> source_clock,
+             std::int64_t capture_clock_offset_ns)
     : frame_log_(directory / "frames.jsonl"),
       encoded_log_(directory / "encoded.jsonl"),
-      source_clock_(std::move(source_clock)) {
-  if (!frame_log_ || !encoded_log_)
+      source_clock_(std::move(source_clock)),
+      capture_clock_offset_ns_(capture_clock_offset_ns) {
+  if (!frame_log_ || !encoded_log_) {
     throw std::runtime_error("Cannot create frame logs");
+  }
   gst_init(nullptr, nullptr);
   GError* error = nullptr;
-  pipeline_ = gst_parse_launch(
+#ifdef _WIN32
+  constexpr auto kEncoder = "nvh264enc";
+  constexpr auto kEncodePipeline =
+      "nvh264enc preset=p1 tune=ultra-low-latency rc-mode=cbr "
+      "bitrate=2000 gop-size=30 bframes=0 zerolatency=true ";
+#else
+  constexpr auto kEncoder = "x264enc";
+  constexpr auto kEncodePipeline =
+      "x264enc tune=zerolatency speed-preset=ultrafast "
+      "bitrate=2000 key-int-max=30 threads=2 ";
+#endif
+  // Windows requires NVENC; hardware initialization errors must not silently
+  // switch a simulation performance run to software encoding.
+  const std::string pipeline =
       "appsrc name=frames is-live=true format=time block=false "
       "max-bytes=1382400 leaky-type=downstream "
       "caps=video/x-raw,format=BGR,width=640,height=360,framerate=30/1 "
       "! queue max-size-buffers=2 leaky=downstream ! videoconvert "
-      "! video/x-raw,format=I420 ! x264enc tune=zerolatency "
-      "speed-preset=ultrafast "
-      "bitrate=2000 key-int-max=30 threads=2 ! h264parse ! tee name=encoded "
+      "! video/x-raw,format=NV12 ! " +
+      std::string(kEncodePipeline) +
+      "! h264parse ! tee name=encoded "
       "encoded. ! queue ! rtph264pay name=rtp pt=96 config-interval=1 "
       "! udpsink name=network port=5602 sync=false async=false "
       "encoded. ! queue ! mp4mux faststart=true "
-      "! filesink name=record sync=false async=false",
-      &error);
+      "! filesink name=record sync=false async=false";
+  pipeline_ = gst_parse_launch(pipeline.c_str(), &error);
   if (error != nullptr || pipeline_ == nullptr) {
     const std::string message =
         error == nullptr ? "No video pipeline" : error->message;
-    if (error != nullptr) g_error_free(error);
-    if (pipeline_ != nullptr) gst_object_unref(pipeline_);
+    if (error != nullptr) {
+      g_error_free(error);
+    }
+    if (pipeline_ != nullptr) {
+      gst_object_unref(pipeline_);
+    }
     pipeline_ = nullptr;
     throw std::runtime_error(message);
+  }
+  std::ofstream encoder_log(directory / "encoder.json");
+  if (!encoder_log ||
+      !(encoder_log << nlohmann::json{{"factory", kEncoder},
+                                      {"gstreamer", gst_version_string()}}
+                           .dump(2)
+                    << '\n')) {
+    gst_object_unref(pipeline_);
+    pipeline_ = nullptr;
+    throw std::runtime_error("Cannot write encoder provenance");
   }
   auto* network = gst_bin_get_by_name(GST_BIN(pipeline_), "network");
   auto* record = gst_bin_get_by_name(GST_BIN(pipeline_), "record");
@@ -79,9 +109,15 @@ Video::~Video() {
       // Preserve the original run error while releasing the recording pipeline.
     }
   }
-  if (pipeline_ != nullptr) gst_element_set_state(pipeline_, GST_STATE_NULL);
-  if (source_ != nullptr) gst_object_unref(source_);
-  if (pipeline_ != nullptr) gst_object_unref(pipeline_);
+  if (pipeline_ != nullptr) {
+    gst_element_set_state(pipeline_, GST_STATE_NULL);
+  }
+  if (source_ != nullptr) {
+    gst_object_unref(source_);
+  }
+  if (pipeline_ != nullptr) {
+    gst_object_unref(pipeline_);
+  }
 }
 
 void Video::Receive(const std::string& bytes) noexcept {
@@ -117,7 +153,8 @@ void Video::Receive(const std::string& bytes) noexcept {
       return;
     }
     gst_buffer_fill(buffer.get(), 0, pixels.data(), pixels.size());
-    AttachCaptureTime(buffer.get(), image.GetTimestamp());
+    const auto capture_ns = image.GetTimestamp() + capture_clock_offset_ns_;
+    AttachCaptureTime(buffer.get(), capture_ns);
     GST_BUFFER_PTS(buffer.get()) = pts;
     GST_BUFFER_DURATION(buffer.get()) = GST_SECOND / 30;
     if (gst_app_src_push_buffer(GST_APP_SRC(source_), buffer.release()) !=
@@ -128,13 +165,16 @@ void Video::Receive(const std::string& bytes) noexcept {
     frame_log_ << nlohmann::json{{"index", frames_.load()},
                                  {"pts_ns", pts},
                                  {"source_sim_ns", image.GetTimestamp()},
+                                 {"capture_ns", capture_ns},
                                  {"receive_steady_ns", received},
                                  {"queued_bytes",
                                   gst_app_src_get_current_level_bytes(
                                       GST_APP_SRC(source_))}}
                       .dump()
                << '\n';
-    if (!frame_log_) throw std::runtime_error("Frame log failed");
+    if (!frame_log_) {
+      throw std::runtime_error("Frame log failed");
+    }
     ++frames_;
   } catch (const std::exception&) {
     ++rejected_;
@@ -149,20 +189,25 @@ GstPadProbeReturn Video::Encoded(GstPad*, GstPadProbeInfo* info,
     auto* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
     const auto* origin = gst_buffer_get_reference_timestamp_meta(buffer, caps);
     gst_caps_unref(caps);
-    if (!origin || origin->timestamp < 2208988800ULL * GST_SECOND)
+    if (!origin || origin->timestamp < 2208988800ULL * GST_SECOND) {
       throw std::runtime_error("Encoded frame lost acquisition identity");
+    }
     const auto time = std::chrono::duration_cast<std::chrono::nanoseconds>(
                           std::chrono::steady_clock::now().time_since_epoch())
                           .count();
+    const auto capture_ns = static_cast<std::int64_t>(
+        origin->timestamp - 2208988800ULL * GST_SECOND);
     self.encoded_log_ << nlohmann::json{{"source_sim_ns",
-                                         origin->timestamp -
-                                             2208988800ULL * GST_SECOND},
+                                         capture_ns -
+                                             self.capture_clock_offset_ns_},
+                                        {"capture_ns", capture_ns},
                                         {"encoded_steady_ns", time},
                                         {"bytes", gst_buffer_get_size(buffer)}}
                              .dump()
                       << '\n';
-    if (!self.encoded_log_)
+    if (!self.encoded_log_) {
       throw std::runtime_error("Encoded frame log failed");
+    }
     return GST_PAD_PROBE_OK;
   } catch (const std::exception&) {
     ++self.rejected_;
@@ -178,12 +223,17 @@ void Video::Finish() {
       static_cast<GstMessageType>(GST_MESSAGE_EOS | GST_MESSAGE_ERROR));
   const bool success =
       message != nullptr && GST_MESSAGE_TYPE(message) == GST_MESSAGE_EOS;
-  if (message != nullptr) gst_message_unref(message);
+  if (message != nullptr) {
+    gst_message_unref(message);
+  }
   gst_object_unref(bus);
-  if (!success) throw std::runtime_error("Recording did not finish");
+  if (!success) {
+    throw std::runtime_error("Recording did not finish");
+  }
   gst_element_set_state(pipeline_, GST_STATE_NULL);
   finished_ = true;
-  if (Frames() == 0 || Rejected() != 0)
+  if (Frames() == 0 || Rejected() != 0) {
     throw std::runtime_error("Camera frames missing or rejected");
+  }
 }
 }  // namespace raven::simulation

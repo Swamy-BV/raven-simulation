@@ -1,0 +1,61 @@
+{
+  "stream_verified": true,
+  "host": "Windows",
+  "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+  "encoder": {
+    "factory": "nvh264enc",
+    "gstreamer": "GStreamer 1.28.8 (GIT)"
+  },
+  "received_frames": 4116,
+  "encoded_frames": 4116,
+  "wall_seconds": 153.7448024,
+  "measured_fps": 26.76513245172313,
+  "flight_validation": "Sustained following, braking, hold and landing passed; strict rear-formation gate failed during turns",
+  "latest_flight_validation": {
+    "scenario_speed_mps": 5,
+    "system_id": 2,
+    "closed_loop_flight_test_passed": true,
+    "all_quality_gates_passed": false,
+    "following_sim_seconds": 40.004,
+    "following_wall_seconds": 40.17991663400608,
+    "horizontal_displacement_m": 139.03185505641275,
+    "following_fraction": 0.925556586270872,
+    "clock_delivery": {
+      "updates": 5385,
+      "max_step_ms": 60.0,
+      "max_wall_gap_ms": 115.721673,
+      "regressions": 0
+    },
+    "maximum_control_clock_step_ms": 250,
+    "stopping_sim_seconds": 3.136,
+    "stopping_distance_m": 9.448876563382266,
+    "hold_drift_m": 0.06369973939489396,
+    "trailing_bearing_error_p95_deg": 37.38251589704031,
+    "max_trailing_bearing_error_p95_deg": 30,
+    "normal_landing_and_disarm_verified": true,
+    "physical_m7_remained_disarmed": true,
+    "detector_model": "yolov8m-neutron",
+    "acceptance": {
+      "rear_formation": false,
+      "duration": true,
+      "movement": true,
+      "following_fraction": true,
+      "hold_drift": true,
+      "m7_disarmed": true,
+      "sim_disarmed": true
+    }
+  },
+  "review": {
+    "seconds": 46.960747663,
+    "frames": 1265,
+    "frames_with_ros_tracks": 1242,
+    "unmatched_frames": 0,
+    "playback": "Original wall-time cadence; no speed-up"
+  },
+  "fixes": [
+    "Reliable ordered XRCE simulation clock with bounded history",
+    "TCP_NODELAY on the lockstep HIL relay",
+    "Braking completion observed from fresh position-hold setpoints instead of 1 Hz diagnostics"
+  ],
+  "remaining": "Reduce lateral formation error during viewpoint changes; no physical-flight or 40 mph following claim"
+}

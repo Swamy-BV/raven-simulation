@@ -3,8 +3,8 @@
   "scene_id": "CarLoop",
   "aircraft": {
     "name": "CameraDrone",
-    "xyz": "-6 -10 -4",
-    "rpy_deg": "0 0 0"
+    "xyz": "2 -18 -4",
+    "rpy_deg": "0 0 90"
   },
   "target": {
     "name": "TargetCar",
@@ -26,5 +26,17 @@
     "corner_radius_m": 6
   },
   "target_speed_mps": 0.1,
-  "target_start_delay_s": 60
+  "target_start_delay_s": 60,
+  "following_parameters": {
+    "ground_z": 1.2,
+    "target_position_stddev": 0.35,
+    "target_acceleration_noise": 0.05,
+    "align_with_motion": true,
+    "minimum_heading_speed": 0.2
+  },
+  "camera": {
+    "pitch_down_deg": 35,
+    "horizontal_fov_deg": 80.2140913183,
+    "stabilized": true
+  }
 }

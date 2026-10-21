@@ -15,10 +15,28 @@
   },
   "route": {
     "type": "rounded_rectangle",
-    "min_xy_m": [2, -16],
-    "max_xy_m": [130, 112],
+    "min_xy_m": [
+      2,
+      -16
+    ],
+    "max_xy_m": [
+      130,
+      112
+    ],
     "corner_radius_m": 6
   },
   "target_speed_mps": 0.4,
-  "target_start_delay_s": 60
+  "target_start_delay_s": 60,
+  "following_parameters": {
+    "ground_z": 1.2,
+    "target_position_stddev": 0.35,
+    "target_acceleration_noise": 0.1,
+    "align_with_motion": true,
+    "minimum_heading_speed": 0.2
+  },
+  "camera": {
+    "pitch_down_deg": 35,
+    "horizontal_fov_deg": 80.2140913183,
+    "stabilized": true
+  }
 }

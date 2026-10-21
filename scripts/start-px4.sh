@@ -40,7 +40,8 @@ export PX4_UXRCE_DDS_NS=simulation PX4_UXRCE_DDS_PORT=8889
 export PX4_PARAM_UXRCE_DDS_AG_IP="$agent_ip"
 export PX4_PARAM_UXRCE_DDS_PTCFG=1 PX4_PARAM_UXRCE_DDS_SYNCT=0 PX4_PARAM_UXRCE_DDS_DOM_ID=0
 # Instance 1 keeps system ID 2; relay to the scoped Windows simulator port.
-socat TCP-LISTEN:4561,bind=127.0.0.1,reuseaddr,fork TCP:"$host":4560 &
+# Match PX4 HIL sockets: do not coalesce small lockstep sensor/actuator packets.
+socat TCP-LISTEN:4561,bind=127.0.0.1,reuseaddr,fork,nodelay TCP:"$host":4560,nodelay &
 relay=$!
 trap 'kill "$relay" 2>/dev/null || true; wait "$relay" 2>/dev/null || true' EXIT
 "$px4/build/px4_sitl_default/bin/px4" -d "$px4/build/px4_sitl_default/etc" -i 1 -w "$work"

@@ -19,7 +19,9 @@ constexpr double kPi = 3.14159265358979323846;
 
 Json Read(const std::filesystem::path& path) {
   std::ifstream file(path);
-  if (!file) throw std::runtime_error("Cannot read " + path.string());
+  if (!file) {
+    throw std::runtime_error("Cannot read " + path.string());
+  }
   return Json::parse(file, nullptr, true, true);
 }
 
@@ -54,9 +56,12 @@ std::vector<Point> Route(const Json& route) {
     }
   };
   const auto arc = [&](const Point& center, const double a, const double b) {
-    constexpr int kSamples = 12;
-    for (int i = 0; i < kSamples; ++i) {
-      const double angle = a + (b - a) * i / kSamples;
+    // Preserve the compact profiles, but keep wide high-speed bends near the
+    // same metre-scale resolution as the straight sections.
+    const auto samples =
+        std::max(12, static_cast<int>(std::ceil(radius * std::abs(b - a))));
+    for (int i = 0; i < samples; ++i) {
+      const double angle = a + (b - a) * i / samples;
       points.push_back({center[0] + radius * std::cos(angle),
                         center[1] + radius * std::sin(angle)});
     }
@@ -92,6 +97,12 @@ Json InsetRoute(Json route, const double inset) {
 }
 
 std::vector<Json> ActorProfiles(const Json& settings) {
+  if (!settings.contains("target")) {
+    if (settings.contains("traffic") || settings.contains("route")) {
+      throw std::runtime_error("Traffic and routes require a target");
+    }
+    return {};
+  }
   std::vector<Json> profiles{settings};
   const auto traffic = settings.value("traffic", Json::array());
   if (!traffic.is_array() || traffic.size() > 7) {
@@ -118,7 +129,9 @@ std::vector<Json> ActorProfiles(const Json& settings) {
 std::vector<double> Speeds(const std::vector<Point>& points,
                            const Json& profile, const double speed) {
   std::vector<double> result(points.size(), speed);
-  if (!profile.contains("vehicle_acceleration_mps2")) return result;
+  if (!profile.contains("vehicle_acceleration_mps2")) {
+    return result;
+  }
   const auto acceleration =
       profile.at("vehicle_acceleration_mps2").get<double>();
   const auto lateral =
@@ -136,8 +149,9 @@ std::vector<double> Speeds(const std::vector<Point>& points,
         std::abs(std::atan2(ax * by - ay * bx, ax * bx + ay * by));
     const auto curvature =
         angle / ((std::hypot(ax, ay) + std::hypot(bx, by)) / 2);
-    if (curvature > 1e-6)
+    if (curvature > 1e-6) {
       result[i] = std::min(speed, std::sqrt(lateral / curvature));
+    }
   }
   result.front() = 0;
   result.back() = 0;
@@ -174,8 +188,9 @@ Json Trajectory(const Json& profile) {
     throw std::runtime_error("Invalid traffic phase or route translation");
   }
   points.pop_back();
-  if (profile.value("reverse", false))
+  if (profile.value("reverse", false)) {
     std::reverse(points.begin(), points.end());
+  }
   const auto phase_index = static_cast<std::size_t>(phase * points.size());
   std::rotate(points.begin(), points.begin() + phase_index, points.end());
   for (auto& point : points) {
@@ -214,17 +229,87 @@ Json Trajectory(const Json& profile) {
     if (i + 1 < points.size()) {
       double next = std::atan2(points[i + 1][1] - points[i][1],
                                points[i + 1][0] - points[i][0]);
-      while (next - heading > kPi) next -= 2 * kPi;
-      while (next - heading < -kPi) next += 2 * kPi;
+      while (next - heading > kPi) {
+        next -= 2 * kPi;
+      }
+      while (next - heading < -kPi) {
+        next += 2 * kPi;
+      }
       heading = next;
     }
     append(elapsed, points[i], heading, speeds[i]);
-    if (i + 1 < points.size())
+    if (i + 1 < points.size()) {
       elapsed += std::hypot(points[i + 1][0] - points[i][0],
                             points[i + 1][1] - points[i][1]) /
                  ((speeds[i] + speeds[i + 1]) / 2);
+    }
   }
   return t;
+}
+
+Json Course(const Json& profile) {
+  Json objects = Json::array();
+  if (!profile.contains("course")) {
+    return objects;
+  }
+  const auto& course = profile.at("course");
+  const auto spacing = course.at("tile_spacing_m").get<double>();
+  const auto width = course.at("road_width_m").get<double>();
+  const auto height = course.at("surface_z_m").get<double>();
+  if (!std::isfinite(spacing) || spacing < 2 || spacing > 16 ||
+      !std::isfinite(width) || width < 8 || width > 40 ||
+      !std::isfinite(height)) {
+    throw std::runtime_error("Invalid course geometry");
+  }
+  auto minimum = profile.at("route").at("min_xy_m").get<Point>();
+  auto maximum = profile.at("route").at("max_xy_m").get<Point>();
+  const auto object = [&](const std::string& name, const std::string& asset,
+                          const Json& position, double yaw, const Json& scale) {
+    if (asset.empty()) {
+      throw std::runtime_error("Course asset must not be empty");
+    }
+    objects.push_back({{"name", name},
+                       {"asset", asset},
+                       {"position", position},
+                       {"yaw", yaw},
+                       {"scale", scale}});
+  };
+  // The shared pad supplies a continuous collision surface above the existing
+  // environment. Road meshes are visual tiles, independent of car trajectories.
+  object("RaceSurface", course.at("surface_asset"),
+         {(minimum[0] + maximum[0]) / 2, (minimum[1] + maximum[1]) / 2,
+          height + 0.5},
+         0, {maximum[0] - minimum[0] + 100, maximum[1] - minimum[1] + 100, 1});
+  const auto points = Route(profile.at("route"));
+  double accumulated = spacing;
+  for (std::size_t i = 0; i + 1 < points.size(); ++i) {
+    if (i > 0) {
+      accumulated += std::hypot(points[i][0] - points[i - 1][0],
+                                points[i][1] - points[i - 1][1]);
+    }
+    if (accumulated < spacing) {
+      continue;
+    }
+    accumulated = 0;
+    const auto yaw = std::atan2(points[i + 1][1] - points[i][1],
+                                points[i + 1][0] - points[i][0]);
+    // Neighborhood's Road_01New tile is 16 x 16 metres at unit scale.
+    object("RaceRoad" + std::to_string(i), course.at("road_asset"),
+           {points[i][0], points[i][1], height - 0.03}, yaw - kPi / 2,
+           {(spacing + 6) / 16, width / 16, 1});
+    if (objects.size() > 2000) {
+      throw std::runtime_error("Course exceeds scenery object limit");
+    }
+  }
+  return objects;
+}
+
+bool IsHitl(const Json& profile) {
+  const auto mode = profile.value("flight_controller", std::string("sitl"));
+  if (mode != "sitl" && mode != "hitl") {
+    throw std::runtime_error("Flight controller must be sitl or hitl");
+  }
+  return mode == "hitl";
 }
 
 Json Scene(const Json& profile) {
@@ -236,14 +321,11 @@ Json Scene(const Json& profile) {
          {"name", aircraft.at("name")},
          {"origin",
           {{"xyz", aircraft.at("xyz")}, {"rpy-deg", aircraft.at("rpy_deg")}}},
-         {"robot-config", "camera.jsonc"}}}},
-      {"environment-actors",
-       {{{"type", "env_actor"},
-         {"name", profile.at("target").at("name")},
-         {"origin", {{"xyz", "0 0 0"}, {"rpy-deg", "0 0 0"}}},
-         {"env-actor-config", "target.jsonc"}}}},
+         {"robot-config", "camera.jsonc"},
+         {"start-landed", IsHitl(profile)}}}},
+      {"environment-actors", Json::array()},
       {"clock",
-       {{"type", "steppable"},
+       {{"type", IsHitl(profile) ? "real-time" : "steppable"},
         {"step-ns", 4000000},
         {"real-time-update-rate", 4000000},
         {"pause-on-start", false}}},
@@ -291,7 +373,7 @@ Json Camera(const Json& profile) {
 
 void WriteFlightConfiguration(const Json& profile,
                               const std::filesystem::path& directory) {
-  std::ofstream file(directory / "px4.env");
+  std::ofstream file(directory / "px4.env", std::ios::binary);
   const auto parameters = profile.value("px4_parameters", Json::object());
   if (!parameters.is_object()) {
     throw std::runtime_error("PX4 parameters must be an object");
@@ -307,7 +389,9 @@ void WriteFlightConfiguration(const Json& profile,
     }
     file << "PX4_PARAM_" << name << '=' << entry.value().dump() << '\n';
   }
-  if (!file) throw std::runtime_error("Cannot write PX4 scenario parameters");
+  if (!file) {
+    throw std::runtime_error("Cannot write PX4 scenario parameters");
+  }
 }
 
 void WriteCameraConfiguration(const Json& profile,
@@ -338,14 +422,16 @@ void WriteCameraConfiguration(const Json& profile,
          {"data",
           {focal, 0, kHalfWidth, 0, 0, focal, kHalfHeight, 0, 0, 0, 1, 0}}}}});
   auto following = profile.value("following_parameters", Json::object());
+  if (profile.value("flight_controller", std::string("sitl")) == "hitl") {
+    following["px4_namespace"] = "";
+  }
   following["camera_pitch"] = camera.value("pitch_down_deg", 35.0) * kPi / 180;
   following["camera_stabilized"] = camera.value("stabilized", false);
   following["camera_forward"] = 0.5;
   following["camera_right"] = 0.0;
   following["camera_down"] = 0.2;
-  Write(directory / "following.yaml",
-        {{"/raven/vehicle_1/autonomy/target_follower",
-          {{"ros__parameters", following}}}});
+  Write(directory / "following.yaml", {{"/raven/vehicle_1/autonomy/guidance",
+                                        {{"ros__parameters", following}}}});
 }
 }  // namespace
 
@@ -356,6 +442,11 @@ void ValidateScenario(const std::filesystem::path& profile,
     throw std::runtime_error("Unsupported scenario schema version");
   }
   const auto profiles = ActorProfiles(settings);
+  if (settings.value("target_start_on_ready", false) &&
+      (!IsHitl(settings) || profiles.empty())) {
+    throw std::runtime_error(
+        "Deferred target start requires HITL and a target");
+  }
   std::set<std::string> names{
       settings.at("aircraft").at("name").get<std::string>()};
   for (const auto& actor_profile : profiles) {
@@ -375,62 +466,99 @@ void ValidateScenario(const std::filesystem::path& profile,
     }
     Trajectory(actor_profile);
   }
-  const auto trajectory = Trajectory(settings);
-  const auto size = trajectory.at("time_sec").size();
-  for (const auto& field : trajectory.items()) {
-    if (field.key() != "name" && field.value().size() != size) {
-      throw std::runtime_error("Mismatched trajectory arrays");
-    }
-  }
-  if (trajectory.at("pose_x").front() != trajectory.at("pose_x").back() ||
-      trajectory.at("pose_y").front() != trajectory.at("pose_y").back()) {
-    throw std::runtime_error("Street route is not closed");
-  }
   std::filesystem::create_directories(directory);
   WriteCameraConfiguration(settings, directory);
   WriteFlightConfiguration(settings, directory);
-  Write(directory / "trajectory.json", trajectory);
   auto scene = Scene(settings);
   Json traffic = Json::array();
-  for (std::size_t i = 1; i < profiles.size(); ++i) {
+  for (std::size_t i = 0; i < profiles.size(); ++i) {
     const auto& actor = profiles[i].at("target");
     scene["environment-actors"].push_back(
         {{"type", "env_actor"},
          {"name", actor.at("name")},
          {"origin", {{"xyz", "0 0 0"}, {"rpy-deg", "0 0 0"}}},
          {"env-actor-config", ActorFile(i)}});
-    traffic.push_back(actor);
-    Write(directory / ("traffic-" + std::to_string(i) + "-trajectory.json"),
-          Trajectory(profiles[i]));
+    if (i > 0) {
+      traffic.push_back(actor);
+    }
+    const auto trajectory = Trajectory(profiles[i]);
+    const auto size = trajectory.at("time_sec").size();
+    for (const auto& field : trajectory.items()) {
+      if (field.key() != "name" && field.value().size() != size) {
+        throw std::runtime_error("Mismatched trajectory arrays");
+      }
+    }
+    if (trajectory.at("pose_x").front() != trajectory.at("pose_x").back() ||
+        trajectory.at("pose_y").front() != trajectory.at("pose_y").back()) {
+      throw std::runtime_error("Street route is not closed");
+    }
+    const auto filename =
+        i == 0 ? "trajectory.json"
+               : "traffic-" + std::to_string(i) + "-trajectory.json";
+    Write(directory / filename, trajectory);
   }
   Write(directory / "scene.jsonc", scene);
   Write(directory / "bindings.json",
-        {{"aircraft", settings.at("aircraft").at("name")},
+        {{"real_time", IsHitl(settings)},
+         {"target_start_on_ready",
+          settings.value("target_start_on_ready", false)},
+         {"aircraft", settings.at("aircraft").at("name")},
          {"camera", "Front"},
-         {"target", settings.at("target")},
-         {"traffic", traffic}});
+         {"target", settings.value("target", Json())},
+         {"traffic", traffic},
+         {"traffic_start_on_ready",
+          settings.value("traffic_start_on_ready", false)},
+         {"acceptance", settings.value("acceptance", Json::object())},
+         {"scenery", Course(settings)}});
 }
 
-void GenerateScenario(const std::filesystem::path& profile,
-                      const std::filesystem::path& robot_template,
-                      const std::filesystem::path& directory,
-                      const std::string& host) {
+ScenarioRuntime GenerateScenario(const std::filesystem::path& profile,
+                                 const std::filesystem::path& robot_template,
+                                 const std::filesystem::path& directory,
+                                 const std::string& host,
+                                 const std::string& board,
+                                 const std::string& serial_port) {
   ValidateScenario(profile, directory);
+  const bool hitl = IsHitl(Read(profile));
+  const ScenarioRuntime runtime{
+      hitl ? FlightController::kHitl : FlightController::kSitl,
+      Read(profile).value("stream_video_to_board", true)};
   auto robot = Read(robot_template);
   auto& settings = robot["controller"]["px4-settings"];
-  settings["local-host-ip"] = host;
+  settings["local-host-ip"] = hitl ? "0.0.0.0" : host;
+  settings["lock-step"] = !hitl;
+  const bool serial_hitl = !serial_port.empty();
+  if (serial_hitl && !hitl) {
+    throw std::runtime_error(
+        "A physical serial controller requires a HITL scenario");
+  }
+  settings["use-serial"] = serial_hitl;
+  settings["use-tcp"] = !serial_hitl;
+  if (serial_hitl) {
+    settings["serial-port"] = serial_port;
+    settings["serial-baud-rate"] = 921600;
+  }
   settings["tcp-port"] = 4560;
-  settings["control-ip-address"] = "remote";
+  settings["control-ip-address"] = hitl ? board : "remote";
+  if (hitl) {
+    settings["hil-gps-update-rate-hz"] = 10.0;
+  }
   settings["control-port"] = 14581;
   settings["control-port-remote"] = 14581;
   settings["control-port-local"] = 14580;
   settings["parameters"] = Json::object();
   Json sensors = Json::array({Camera(Read(profile))});
   for (const auto& sensor : robot.at("sensors")) {
-    if (sensor.at("type") != "camera") sensors.push_back(sensor);
+    if (sensor.at("type") != "camera") {
+      sensors.push_back(sensor);
+    }
   }
   robot["sensors"] = sensors;
   Write(directory / "camera.jsonc", robot);
+  const auto profiles = ActorProfiles(Read(profile));
+  if (profiles.empty()) {
+    return runtime;
+  }
   auto rover =
       Read(robot_template.parent_path() / "robot_rover_fastphysics.jsonc");
   Json actor = {{"links", rover.at("links")}, {"joints", rover.at("joints")}};
@@ -438,12 +566,12 @@ void GenerateScenario(const std::filesystem::path& profile,
     link.erase("inertial");
     link["collision"] = {{"enabled", false}};
   }
-  const auto profiles = ActorProfiles(Read(profile));
   for (std::size_t i = 0; i < profiles.size(); ++i) {
     actor["script"] = {{"loop", true},
                        {"auto_start", true},
                        {"trajectory", Trajectory(profiles[i])}};
     Write(directory / ActorFile(i), actor);
   }
+  return runtime;
 }
 }  // namespace raven::simulation

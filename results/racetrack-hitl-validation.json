@@ -1,0 +1,45 @@
+{
+  "passed": false,
+  "scenario": "hitl-racetrack",
+  "cars": 3,
+  "target_cruise_mph": 40,
+  "timed_following_before_loss_seconds": 16.99,
+  "controller": "physical i.MX95 Cortex-M7 PX4 HITL; no SITL",
+  "model": "yolov8s-neutron",
+  "normal_arming": true,
+  "cleanup_landed_and_disarmed": true,
+  "limitations": [
+    "61-second sustained-following gate failed",
+    "selected identity lost after first bend and straight",
+    "yaw and lateral smoothness remain to be improved"
+  ],
+  "checks": {
+    "scenario_ctest": 9,
+    "native_high_speed_smoother": true,
+    "yocto_guidance_build": true
+  },
+  "rejected_experiments": [
+    "lower M7 yaw-controller gains: hover-error gate failed; restored",
+    "zero-scale vegetation: Unreal crash; removed"
+  ],
+  "recordings_are_local": true,
+  "measured_car_average_mph": 39.999,
+  "speed_measurement_note": "Full recorded path length divided by wall time; short-window peak/median have fixture sampling jitter",
+  "source_profile": "scenarios/hitl-racetrack.jsonc",
+  "course_m": {
+    "width": 500,
+    "height": 300,
+    "bend_radius": 110,
+    "surface_elevation": 120
+  },
+  "requested_hover_height_m": 4.5,
+  "requested_follow_distance_m": 8,
+  "requested_bench_heading_parameters": {
+    "EKF2_MAG_TYPE": 6,
+    "EKF2_DECL_TYPE": 2,
+    "EKF2_MAG_DECL": 1.520386
+  },
+  "heading_configuration_note": "Experimental simulator-only initialization; PX4 can update declination during operation. Not a validated hardware calibration.",
+  "board_after_test": "disarmed; normal media/inference/tracking/DDS services restored; guidance stopped; temporary controller parameters restored",
+  "overtaking_and_occlusion": "not validated"
+}

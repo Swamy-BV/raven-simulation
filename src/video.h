@@ -13,7 +13,8 @@ namespace raven::simulation {
 class Video {
  public:
   Video(const std::string& host, const std::filesystem::path& directory,
-        std::function<void(std::int64_t)> source_clock);
+        std::function<void(std::int64_t)> source_clock,
+        std::int64_t capture_clock_offset_ns);
   ~Video();
   Video(const Video&) = delete;
   Video& operator=(const Video&) = delete;
@@ -32,6 +33,7 @@ class Video {
   std::ofstream frame_log_;
   std::ofstream encoded_log_;
   std::function<void(std::int64_t)> source_clock_;
+  const std::int64_t capture_clock_offset_ns_;
   std::atomic<unsigned> frames_{0};
   std::atomic<unsigned> rejected_{0};
   bool finished_ = false;
