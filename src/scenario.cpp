@@ -75,6 +75,22 @@ std::vector<Point> Route(const Json& route) {
   return points;
 }
 
+Json InsetRoute(Json route, const double inset) {
+  if (!std::isfinite(inset)) {
+    throw std::runtime_error("Invalid traffic route inset");
+  }
+  auto minimum = route.at("min_xy_m").get<Point>();
+  auto maximum = route.at("max_xy_m").get<Point>();
+  for (std::size_t axis = 0; axis < minimum.size(); ++axis) {
+    minimum[axis] += inset;
+    maximum[axis] -= inset;
+  }
+  route["min_xy_m"] = minimum;
+  route["max_xy_m"] = maximum;
+  route["corner_radius_m"] = route.at("corner_radius_m").get<double>() - inset;
+  return route;
+}
+
 std::vector<Json> ActorProfiles(const Json& settings) {
   std::vector<Json> profiles{settings};
   const auto traffic = settings.value("traffic", Json::array());
@@ -86,6 +102,8 @@ std::vector<Json> ActorProfiles(const Json& settings) {
     auto target = settings.at("target");
     target.update(actor);
     profile["target"] = target;
+    profile["route"] =
+        InsetRoute(settings.at("route"), actor.value("route_inset_m", 0.0));
     profile["target_speed_mps"] =
         actor.value("speed_mps", settings.at("target_speed_mps").get<double>());
     profile["phase_fraction"] = actor.value("phase_fraction", 0.0);
@@ -153,7 +171,7 @@ Json Trajectory(const Json& profile) {
   const auto offset = profile.value("route_offset_xy_m", Point{0, 0});
   if (!std::isfinite(phase) || phase < 0 || phase >= 1 ||
       !std::isfinite(offset[0]) || !std::isfinite(offset[1])) {
-    throw std::runtime_error("Invalid traffic phase or lane offset");
+    throw std::runtime_error("Invalid traffic phase or route translation");
   }
   points.pop_back();
   if (profile.value("reverse", false))
@@ -163,6 +181,14 @@ Json Trajectory(const Json& profile) {
   for (auto& point : points) {
     point[0] += offset[0];
     point[1] += offset[1];
+  }
+  const auto laps = profile.value("route_laps", 1U);
+  if (laps == 0 || laps > 10) {
+    throw std::runtime_error("Route laps must be 1..10");
+  }
+  const auto lap = points;
+  for (unsigned int index = 1; index < laps; ++index) {
+    points.insert(points.end(), lap.begin(), lap.end());
   }
   points.push_back(points.front());
   const auto speeds = Speeds(points, profile, speed);
@@ -231,23 +257,95 @@ std::string ActorFile(const std::size_t index) {
                     : "traffic-" + std::to_string(index) + ".jsonc";
 }
 
-Json Camera() {
+Json Camera(const Json& profile) {
+  const auto camera = profile.value("camera", Json::object());
+  const auto pitch = camera.value("pitch_down_deg", 35.0);
+  const auto fov = camera.value("horizontal_fov_deg", 80.2140913183);
+  if (!std::isfinite(pitch) || pitch < 0 || pitch > 80 || !std::isfinite(fov) ||
+      fov < 30 || fov > 120) {
+    throw std::runtime_error("Invalid camera pitch or field of view");
+  }
   return {{"id", "Front"},
           {"type", "camera"},
           {"enabled", true},
           {"parent-link", "Frame"},
           {"capture-interval", 1.0 / 30},
-          {"origin", {{"xyz", "0.5 0 0.2"}, {"rpy-deg", "0 -35 0"}}},
+          {"gimbal",
+           {{"lock-roll", camera.value("stabilized", false)},
+            {"lock-pitch", camera.value("stabilized", false)},
+            {"lock-yaw", false}}},
+          {"origin",
+           {{"xyz", "0.5 0 0.2"},
+            {"rpy-deg", "0 " + std::to_string(-pitch) + " 0"}}},
           {"capture-settings",
            {{{"image-type", 0},
              {"width", 640},
              {"height", 360},
-             {"fov-degrees", 80.2140913183},
+             {"fov-degrees", fov},
              {"capture-enabled", true},
              {"streaming-enabled", true},
              {"pixels-as-float", false},
              {"compress", false},
              {"target-gamma", 2.2}}}}};
+}
+
+void WriteFlightConfiguration(const Json& profile,
+                              const std::filesystem::path& directory) {
+  std::ofstream file(directory / "px4.env");
+  const auto parameters = profile.value("px4_parameters", Json::object());
+  if (!parameters.is_object()) {
+    throw std::runtime_error("PX4 parameters must be an object");
+  }
+  for (const auto& entry : parameters.items()) {
+    const auto& name = entry.key();
+    if (name.rfind("MPC_", 0) != 0 ||
+        name.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") !=
+            std::string::npos ||
+        !entry.value().is_number() ||
+        !std::isfinite(entry.value().get<double>())) {
+      throw std::runtime_error("Invalid scenario position-control parameter");
+    }
+    file << "PX4_PARAM_" << name << '=' << entry.value().dump() << '\n';
+  }
+  if (!file) throw std::runtime_error("Cannot write PX4 scenario parameters");
+}
+
+void WriteCameraConfiguration(const Json& profile,
+                              const std::filesystem::path& directory) {
+  Camera(profile);
+  const auto camera = profile.value("camera", Json::object());
+  const auto fov = camera.value("horizontal_fov_deg", 80.2140913183);
+  constexpr double kHalfWidth = 320;
+  constexpr double kHalfHeight = 180;
+  const auto focal = kHalfWidth / std::tan(fov * kPi / 360);
+  Write(
+      directory / "camera.yaml",
+      {{"image_width", 640},
+       {"image_height", 360},
+       {"camera_name", "front_camera"},
+       {"camera_matrix",
+        {{"rows", 3},
+         {"cols", 3},
+         {"data", {focal, 0, kHalfWidth, 0, focal, kHalfHeight, 0, 0, 1}}}},
+       {"distortion_model", "plumb_bob"},
+       {"distortion_coefficients",
+        {{"rows", 1}, {"cols", 5}, {"data", {0, 0, 0, 0, 0}}}},
+       {"rectification_matrix",
+        {{"rows", 3}, {"cols", 3}, {"data", {1, 0, 0, 0, 1, 0, 0, 0, 1}}}},
+       {"projection_matrix",
+        {{"rows", 3},
+         {"cols", 4},
+         {"data",
+          {focal, 0, kHalfWidth, 0, 0, focal, kHalfHeight, 0, 0, 0, 1, 0}}}}});
+  auto following = profile.value("following_parameters", Json::object());
+  following["camera_pitch"] = camera.value("pitch_down_deg", 35.0) * kPi / 180;
+  following["camera_stabilized"] = camera.value("stabilized", false);
+  following["camera_forward"] = 0.5;
+  following["camera_right"] = 0.0;
+  following["camera_down"] = 0.2;
+  Write(directory / "following.yaml",
+        {{"/raven/vehicle_1/autonomy/target_follower",
+          {{"ros__parameters", following}}}});
 }
 }  // namespace
 
@@ -289,6 +387,8 @@ void ValidateScenario(const std::filesystem::path& profile,
     throw std::runtime_error("Street route is not closed");
   }
   std::filesystem::create_directories(directory);
+  WriteCameraConfiguration(settings, directory);
+  WriteFlightConfiguration(settings, directory);
   Write(directory / "trajectory.json", trajectory);
   auto scene = Scene(settings);
   Json traffic = Json::array();
@@ -325,7 +425,7 @@ void GenerateScenario(const std::filesystem::path& profile,
   settings["control-port-remote"] = 14581;
   settings["control-port-local"] = 14580;
   settings["parameters"] = Json::object();
-  Json sensors = Json::array({Camera()});
+  Json sensors = Json::array({Camera(Read(profile))});
   for (const auto& sensor : robot.at("sensors")) {
     if (sensor.at("type") != "camera") sensors.push_back(sensor);
   }

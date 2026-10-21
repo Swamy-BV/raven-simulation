@@ -3,7 +3,7 @@
   "scene_id": "StreetTraffic",
   "aircraft": {
     "name": "CameraDrone",
-    "xyz": "2 -18 -4",
+    "xyz": "-126 -146 -4",
     "rpy_deg": "0 0 90"
   },
   "target": {
@@ -16,8 +16,8 @@
   "route": {
     "type": "rounded_rectangle",
     "min_xy_m": [
-      2,
-      -16
+      -126,
+      -144
     ],
     "max_xy_m": [
       130,
@@ -26,21 +26,56 @@
     "corner_radius_m": 6
   },
   "target_speed_mps": 17.8816,
-  "target_start_delay_s": 60,
+  "target_start_delay_s": 27,
   "vehicle_acceleration_mps2": 3,
   "vehicle_lateral_acceleration_mps2": 2,
   "traffic": [
     {
       "name": "TrafficCar1",
       "display_name": "TrafficSedan1",
-      "phase_fraction": 0.35,
-      "speed_mps": 6
+      "phase_fraction": 0.04,
+      "speed_mps": 6,
+      "route_inset_m": -3
     },
     {
       "name": "TrafficCar2",
       "display_name": "TrafficSedan2",
-      "phase_fraction": 0.65,
-      "speed_mps": 10
+      "phase_fraction": 0.1,
+      "speed_mps": 10,
+      "route_inset_m": 3
     }
-  ]
+  ],
+  "route_laps": 3,
+  "camera": {
+    "pitch_down_deg": 35,
+    "horizontal_fov_deg": 80.2140913183,
+    "stabilized": true
+  },
+  "following_parameters": {
+    "follow_distance": 8.0,
+    "position_gain": 1.2,
+    "max_speed": 20.0,
+    "max_acceleration": 6.0,
+    "max_yaw_rate": 1.0,
+    "max_displacement": 800.0,
+    "max_target_range": 60.0,
+    "ground_z": 1.2,
+    "align_with_motion": true,
+    "motion_bearing_offset": 0.0,
+    "follow_path": true
+  },
+  "px4_parameters": {
+    "MPC_XY_VEL_MAX": 20.0,
+    "MPC_XY_CRUISE": 18.0,
+    "MPC_ACC_HOR": 6.0,
+    "MPC_ACC_HOR_MAX": 8.0,
+    "MPC_TILTMAX_AIR": 45.0,
+    "MPC_YAWRAUTO_MAX": 90.0
+  },
+  "tracking_parameters": {
+    "class_agnostic": true
+  },
+  "vision_parameters": {
+    "model": "yolov8m-neutron"
+  }
 }

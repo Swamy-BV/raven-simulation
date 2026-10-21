@@ -2,7 +2,7 @@
 import json, math, time, struct, zlib
 from collections import OrderedDict
 from pathlib import Path
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -19,6 +19,7 @@ from vision_msgs.msg import Detection2DArray
 from diagnostic_msgs.msg import DiagnosticArray
 from raven_interfaces.srv import SelectTarget
 from std_srvs.srv import SetBool, Trigger
+from rcl_interfaces.srv import GetParameters
 
 
 class FlightSession:
@@ -40,6 +41,7 @@ class FlightSession:
         self.position = None
         self.land = None
         self.tracks = None
+        self.camera_info = None
         self.health = {}
         self.acks = []
         self.stream = False
@@ -96,6 +98,7 @@ class FlightSession:
         )
         self.raw = []
         self.raw_file = open(self.output_dir / "observations.jsonl", "w")
+        self.sample_file = open(self.output_dir / "samples.jsonl", "w")
         self.subs.append(
             self.node.create_subscription(
                 Detection2DArray,
@@ -127,6 +130,18 @@ class FlightSession:
             "/simulation/fmu/in/vehicle_command",
             qos_profile_sensor_data,
         )
+        self.parameters = self.node.create_client(
+            GetParameters, "/raven/vehicle_1/autonomy/target_follower/get_parameters"
+        )
+        self.tracker_parameters = self.node.create_client(
+            GetParameters, "/raven/vehicle_1/perception/target_tracker/get_parameters"
+        )
+        self.vision_parameters = self.node.create_client(
+            GetParameters, "/raven/vehicle_1/perception/vision_engine/get_parameters"
+        )
+        self.subs.append(self.node.create_subscription(
+            CameraInfo, "/raven/vehicle_1/cameras/front/camera_info",
+            self.on_camera_info, qos_profile_sensor_data))
         self.select = self.node.create_client(
             SelectTarget, "/raven/vehicle_1/autonomy/select_target"
         )
@@ -137,6 +152,9 @@ class FlightSession:
             Trigger, "/raven/vehicle_1/perception/reset_tracking"
         )
         self.timer = self.node.create_timer(0.05, self.publish_hold)
+
+    def on_camera_info(self, message):
+        self.camera_info = message
 
     def on_status(self, m):
         self.status = m
@@ -270,6 +288,12 @@ class FlightSession:
         for s in m.status:
             self.health = {v.key: v.value for v in s.values}
             self.health["reason"] = s.message
+            self.raw_file.write(json.dumps({
+                "kind": "following", "stamp_ns": self.node.get_clock().now().nanoseconds,
+                "health": self.health,
+                "ned": [self.position.x,self.position.y,self.position.z] if self.position else None,
+            }) + "\n")
+            self.raw_file.flush()
 
     def timestamp(self):
         return self.node.get_clock().now().nanoseconds // 1000
@@ -373,9 +397,20 @@ class FlightSession:
         self.settled = time.monotonic()
         return False
 
-    def run_follow(self, duration_sim_seconds=25.0):
+    def run_follow(self, duration_sim_seconds=25.0, *, altitude_m=4.5,
+                   selection_after_sim_seconds=65.0,
+                   recording_after_sim_seconds=0.0,
+                   enable_after_sim_seconds=0.0,
+                   braking_acceleration_mps2=None):
         if not 25 <= duration_sim_seconds <= 60:
             raise ValueError("Following duration must be 25..60 simulated seconds")
+        if not 2 <= altitude_m <= 10 or not 0 <= selection_after_sim_seconds <= 120:
+            raise ValueError("Invalid following altitude or selection window")
+        if (braking_acceleration_mps2 is not None
+                and not 0 < braking_acceleration_mps2 <= 8):
+            raise ValueError("Invalid braking acceleration")
+        if not 0 <= recording_after_sim_seconds <= 180:
+            raise ValueError("Invalid following recording start")
         self.wait(
             lambda: self.status
             and self.m7
@@ -402,10 +437,10 @@ class FlightSession:
         self.goal = [
             float(self.position.x),
             float(self.position.y),
-            float(self.position.z) - 4.5,
+            float(self.position.z) - altitude_m,
         ]
         self.stream = True
-        self.wait(lambda: self.count >= 50, 5, "20 Hz offboard warmup")
+        self.wait(lambda: self.count >= 50, 10, "20 Hz offboard warmup")
         self.command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, [1, 6])
         self.wait(
             lambda: self.status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD,
@@ -418,11 +453,12 @@ class FlightSession:
             "normal offboard preflight checks",
         )
         self.command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, [1, 0])
-        self.wait(self.hover_ready, 40, "settled hover at 4.5 m")
+        self.wait(self.hover_ready, 50, f"settled hover at {altitude_m} m")
         self.wait(
-            lambda: self.node.get_clock().now().nanoseconds >= 65000000000,
+            lambda: self.node.get_clock().now().nanoseconds
+            >= selection_after_sim_seconds * 1e9,
             100,
-            "car moving before target selection",
+            "target selection window",
         )
         self.wait(
             lambda: self.visible_car() is not None,
@@ -435,6 +471,10 @@ class FlightSession:
         request.track_id = selected
         reply = self.service(self.select, request)
         assert reply.success, reply.message
+        if enable_after_sim_seconds:
+            self.wait(lambda: self.node.get_clock().now().nanoseconds
+                      >= enable_after_sim_seconds * 1e9,
+                      120, "moving-target engagement window")
         request = SetBool.Request()
         request.data = True
         enabled = False
@@ -457,6 +497,15 @@ class FlightSession:
             5,
             "following enabled for selected ID",
         )
+        if recording_after_sim_seconds:
+            def recording_ready():
+                if self.health.get("state") == "holding":
+                    raise RuntimeError("Following stopped before recording: "
+                                       + self.health.get("reason", ""))
+                return (self.node.get_clock().now().nanoseconds
+                        >= recording_after_sim_seconds * 1e9
+                        and self.health.get("state") == "following")
+            self.wait(recording_ready, 120, "driving-scene recording start")
         start = time.monotonic()
         start_sim = self.node.get_clock().now().nanoseconds
         origin = [self.position.x, self.position.y, self.position.z]
@@ -475,9 +524,13 @@ class FlightSession:
             sample = {
                 "t": round(time.monotonic() - start, 3),
                 "ned": [self.position.x, self.position.y, self.position.z],
+                "velocity_ned": [self.position.vx, self.position.vy, self.position.vz],
+                "sim_ns": self.node.get_clock().now().nanoseconds,
                 "following": dict(self.health),
             }
             self.samples.append(sample)
+            self.sample_file.write(json.dumps(sample) + "\n")
+            self.sample_file.flush()
             if time.monotonic() - last > 2:
                 print("FOLLOW", json.dumps(sample), flush=True)
                 last = time.monotonic()
@@ -499,12 +552,37 @@ class FlightSession:
             flush=True,
         )
         # An identity reset must not make the follower silently choose the new car ID.
+        brake_origin = [self.position.x, self.position.y]
+        brake_speed = math.hypot(self.position.vx, self.position.vy)
+        brake_start = self.node.get_clock().now().nanoseconds
         self.service(self.reset, Trigger.Request())
         self.wait(
             lambda: self.health.get("state") == "holding",
             5,
             "target identity loss holds position",
         )
+        stopping_distance = 0.0
+        stopping_seconds = 0.0
+        if braking_acceleration_mps2 is not None:
+            self.wait(
+                lambda: self.health.get("braking") == "false"
+                and math.hypot(self.position.vx, self.position.vy) < 0.5,
+                30, "settled braking hold")
+            stopping_seconds = (self.node.get_clock().now().nanoseconds
+                                - brake_start) / 1e9
+            stopping_distance = math.dist(
+                brake_origin, [self.position.x, self.position.y])
+            # Include one second for setpoint latency and jerk ramp, then
+            # require the original tight drift bound once stationary.
+            distance_budget = (brake_speed**2 / (2*braking_acceleration_mps2)
+                               + brake_speed + 1.0)
+            time_budget = brake_speed/braking_acceleration_mps2 + 2.0
+            assert stopping_distance <= distance_budget, (
+                "braking distance", stopping_distance, distance_budget)
+            assert stopping_seconds <= time_budget, (
+                "braking time", stopping_seconds, time_budget)
+            print("PASS bounded stopping", stopping_seconds, stopping_distance,
+                  flush=True)
         before = [self.position.x, self.position.y, self.position.z]
         end = time.monotonic() + 3
         while time.monotonic() < end:
@@ -532,6 +610,8 @@ class FlightSession:
             "following_sim_seconds": duration_sim,
             "horizontal_displacement_m": displacement,
             "hold_drift_m": drift,
+            "stopping_distance_m": stopping_distance,
+            "stopping_sim_seconds": stopping_seconds,
             "real_m7_remained_disarmed": True,
             "final_sim_arming_state": self.status.arming_state,
             "samples": self.samples,
@@ -638,4 +718,5 @@ class FlightSession:
                 self.service(self.enable, request)
         finally:
             self.raw_file.close()
+            self.sample_file.close()
             self.node.destroy_node()

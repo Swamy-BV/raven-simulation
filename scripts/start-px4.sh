@@ -25,6 +25,16 @@ agent_ip=$((10#$first * 16777216 + 10#$second * 65536 + 10#$third * 256 + 10#$fo
 mkdir -p "$work"
 exec 9>"$work/run.lock"
 flock -n 9 || { echo 'This PX4 working directory is already in use.' >&2; exit 1; }
+parameters=${5:-}
+if [ -n "$parameters" ]; then
+  while IFS='=' read -r name value; do
+    [[ "$name" =~ ^PX4_PARAM_MPC_[A-Z0-9_]+$ && "$value" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] || {
+      echo 'Invalid scenario position-control parameter' >&2
+      exit 2
+    }
+    export "$name=$value"
+  done < "$parameters"
+fi
 export PX4_SYS_AUTOSTART=10016 PX4_SIMULATOR=none PX4_SIM_HOST_ADDR=127.0.0.1
 export PX4_UXRCE_DDS_NS=simulation PX4_UXRCE_DDS_PORT=8889
 export PX4_PARAM_UXRCE_DDS_AG_IP="$agent_ip"
