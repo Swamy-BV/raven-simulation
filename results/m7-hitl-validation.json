@@ -206,5 +206,45 @@
     "preflight": "Network HITL now requires at least 200 Hz IMU cadence for its 250 Hz profiles",
     "full_rate_setpoints_recorded": true,
     "recordings_are_local": true
+  },
+  "racetrack_timer_validation": {
+    "profile": "scenarios/hitl-racetrack.jsonc",
+    "passed": false,
+    "controller": "physical Cortex-M7 PX4 HITL, system 1 /fmu",
+    "traffic_cars": 3,
+    "requested_target_speed_mph": 40,
+    "normal_arming_and_10_second_hover_passed": true,
+    "physical_motor_outputs_enabled": false,
+    "controller_gains_changed": false,
+    "acceptance_gates_changed": false,
+    "runs": [
+      {
+        "detector": "yolov8s-neutron",
+        "preflight_imu_hz": 249.70737221941087,
+        "cruise_until_last_selected_observation_s": 4.485296514,
+        "failure": "Selected visual identity lost; latched hold",
+        "automatic_cleanup_landing_and_disarm_passed": true
+      },
+      {
+        "detector": "yolov8m-neutron",
+        "preflight_imu_hz": 249.90295789341434,
+        "observed_target_path_average_mph": 40.050850768831054,
+        "cruise_until_last_selected_observation_s": 22.125842833,
+        "pose_alignment_failures": 0,
+        "rejected_observations_before_loss": 0,
+        "failure": "Selected visual identity lost during bend; latched hold",
+        "automatic_cleanup_landing_and_disarm_passed": true
+      }
+    ],
+    "remaining": "Full 61-second cruise following and smooth image centering have not passed. Review visual identity loss and turn control before calling this a completed demo.",
+    "recording": "Local review retains source timing and recorded ROS boxes; labeled PARTIAL RUN",
+    "final_state": {
+      "m7_disarmed": true,
+      "temporary_parameters_restored": true,
+      "board_services_restored": true,
+      "router_override_removed": true,
+      "simulator_stopped": true,
+      "changes_pushed": false
+    }
   }
 }
