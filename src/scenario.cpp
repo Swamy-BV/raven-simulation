@@ -513,6 +513,10 @@ void WriteCameraConfiguration(const Json& profile,
   following["camera_down"] = 0.2;
   Write(directory / "following.yaml", {{"/raven/vehicle_1/autonomy/guidance",
                                         {{"ros__parameters", following}}}});
+  Write(directory / "tracking.yaml",
+        {{"/raven/vehicle_1/perception/target_tracker",
+          {{"ros__parameters",
+            profile.value("tracking_parameters", Json::object())}}}});
 }
 }  // namespace
 

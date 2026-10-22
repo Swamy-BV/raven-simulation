@@ -20,6 +20,7 @@ vision_model=${RAVEN_SIM_VISION_MODEL:-}
 vision_binary=${RAVEN_SIM_VISION_BINARY:-}
 vision_config=${RAVEN_SIM_VISION_CONFIG:-}
 vision_override=0
+tracking_profile=0
 [[ "$vision_model" =~ ^[A-Za-z0-9_-]*$ ]] || { echo "Invalid model identifier" >&2; exit 2; }
 case "$mode" in start|stop) ;; *) echo 'Choose start or stop' >&2; exit 2;; esac
 [[ "$board" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo 'Expected IPv4 address' >&2; exit 2; }
@@ -54,6 +55,10 @@ if [ "$mode" = start ]; then
   if [ -n "$scenario_config" ]; then
     test -r "$scenario_config/camera.yaml"
     test -r "$scenario_config/following.yaml"
+    if [ -r "$scenario_config/tracking.yaml" ]; then
+      ssh "${ssh_args[@]}" root@"$board" 'mkdir -p /run/raven-simulation; cat > /run/raven-simulation/tracking.yaml' < "$scenario_config/tracking.yaml"
+      tracking_profile=1
+    fi
     camera="$scenario_config/camera.yaml"
     profile=1
     ssh "${ssh_args[@]}" root@"$board" 'mkdir -p /run/raven-simulation; cat > /run/raven-simulation/following.yaml' < "$scenario_config/following.yaml"
@@ -65,7 +70,7 @@ if [ "$mode" = start ]; then
     binary=1
   fi
 fi
-ssh "${ssh_args[@]}" root@"$board" /bin/sh -s -- "$mode" "$trace" "$profile" "$binary" "$config" "${vision_model:--}" "$controller" "$vision_override" <<'REMOTE'
+ssh "${ssh_args[@]}" root@"$board" /bin/sh -s -- "$mode" "$trace" "$profile" "$binary" "$config" "${vision_model:--}" "$controller" "$vision_override" "$tracking_profile" <<'REMOTE'
 set -e
 mode=$1
 trace=$2
@@ -76,6 +81,7 @@ vision_model=$6
 [ "$vision_model" = - ] && vision_model=
 controller=$7
 vision_override=$8
+tracking_profile=$9
 sim_time=true
 [ "$controller" = hitl ] && sim_time=false
 if systemctl cat guidance >/dev/null 2>&1; then systemctl stop guidance; fi
@@ -114,6 +120,8 @@ RuntimeDirectoryMode=0700
 ReadWritePaths=/run/vision-engine-validation
 CONF
     fi
+  elif [ "$service" = target-tracker ] && [ "$tracking_profile" = 1 ]; then
+    sed -i '/^ExecStart=./s|$| --params-file /run/raven-simulation/tracking.yaml|' "$override"
   elif [ "$service" = guidance ]; then
     if [ "$config" = 1 ]; then
       sed -i 's|/etc/guidance.yaml|/run/raven-simulation/guidance.yaml|' "$override"

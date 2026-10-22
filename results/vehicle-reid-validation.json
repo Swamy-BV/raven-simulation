@@ -1,0 +1,273 @@
+{
+  "date": "2026-10-22",
+  "controller": "i.MX95 Cortex-M7 PX4 HITL, system ID 1",
+  "companion": "i.MX95 Linux, Neutron YOLOv8s and experimental vehicle ReID, ROS 2 guidance",
+  "open_road_baseline": {
+    "passed": true,
+    "timed_following_seconds": 61,
+    "target_speed_mps": 12,
+    "behind_fraction": 1.0,
+    "bearing_p95_degrees": 3.193143523162321,
+    "cross_track_p95_m": 1.0542985856725
+  },
+  "canopy_runs": [
+    {
+      "run": "m7-hitl-vehicle-reid-canopy-01",
+      "passed": true,
+      "timed_following_seconds": 61,
+      "recovered_gap_seconds": 1.291722,
+      "behind_fraction": 1.0,
+      "bearing_p95_degrees": 3.490274,
+      "cross_track_p95_m": 1.215698
+    },
+    {
+      "run": "m7-hitl-vehicle-reid-canopy-02",
+      "passed": true,
+      "timed_following_seconds": 61,
+      "recovered_gap_seconds": 1.23319,
+      "behind_fraction": 1.0,
+      "bearing_p95_degrees": 4.092254,
+      "cross_track_p95_m": 1.375143,
+      "corrected_quantization": true
+    }
+  ],
+  "urban_latest": {
+    "run": "m7-hitl-vehicle-reid-urban-02",
+    "passed": false,
+    "reviewed_seconds_after_handover": 47.002786883,
+    "target_speed_limit_mph": 40,
+    "observed_recovery_seconds": 1.097622,
+    "terminal_selected_missing_seconds": 3.685496697,
+    "failure": "Selected target lost during early S-bends; guidance latched hold; normal cleanup landed and disarmed."
+  },
+  "qualification": {
+    "same_identity_recovered_across_canopy": true,
+    "learned_reid_cpu_graph_nodes": 0,
+    "source_indexed_association_passed_selective_yocto_build": true,
+    "multi_car_identity_qualified": false,
+    "identical_vehicle_clones_distinguishable_by_appearance": false,
+    "benchmark_accuracy_qualified": false,
+    "note": "Canopy runs used earlier geometry-based association; the final source-indexed association passed six-car straight following and three repeated overpass recoveries. CPU still handles preprocessing and ROS. Fixture poses are evaluation references only.",
+    "normal_board_services_restored": true,
+    "all_three_requested_profiles_tested": true,
+    "temporary_m7_parameters_restored": true,
+    "all_three_runs_landed_and_disarmed": true,
+    "all_fix_retests_landed_and_disarmed": true
+  },
+  "open_road_profiles": {
+    "hitl-open-road-six-cars": {
+      "offline_validated": true,
+      "flight_validated": true,
+      "flight_tested": true
+    },
+    "hitl-open-road-overpasses": {
+      "offline_validated": true,
+      "flight_validated": true,
+      "flight_tested": true
+    },
+    "hitl-open-road-bridge": {
+      "offline_validated": true,
+      "flight_validated": true,
+      "flight_tested": true
+    },
+    "hitl-open-road-six-cars-bridge": {
+      "offline_validated": true,
+      "flight_validated": true,
+      "flight_tested": true
+    }
+  },
+  "six_car_open_road": {
+    "run": "m7-hitl-open-road-six-cars-01",
+    "passed": true,
+    "timed_following_seconds": 61,
+    "target_speed_mps": 12,
+    "cars_including_target": 6,
+    "same_selected_id": true,
+    "selected_visible_fraction": 0.9973684210526316,
+    "largest_observation_gap_seconds": 0.192017,
+    "behind_fraction": 1.0,
+    "bearing_p95_degrees": 2.2112618514678006,
+    "cross_track_p95_m": 0.7788696289062464,
+    "fixture_stand_off_min_m": 14.1056252293991,
+    "normal_arming": true,
+    "loss_hold_passed": true,
+    "landed": true,
+    "disarmed": true,
+    "source_indexed_association": true,
+    "vehicle_reid_backend": "neutron",
+    "vehicle_reid_cpu_graph_nodes": 0,
+    "physical_identity_visual_review": "Recording samples at 2, 20, 45 and 70 seconds show the selected central car, with five surrounding cars. No selected-ID switch recorded.",
+    "recording": {
+      "width": 1280,
+      "height": 720,
+      "duration_seconds": 75.982394,
+      "encoded_frames": 3571,
+      "unmatched_source_frames": 0,
+      "playback": "Original wall-time cadence; no speed-up"
+    }
+  },
+  "repeated_overpasses": {
+    "run": "m7-hitl-open-road-overpasses-01",
+    "passed": true,
+    "timed_following_seconds": 61,
+    "target_speed_mps": 12,
+    "occlusions": 3,
+    "recovered_gaps_seconds": [
+      0.997807,
+      1.005613,
+      0.996542
+    ],
+    "behind_fraction": 1.0,
+    "bearing_p95_degrees": 0.8167953392192286,
+    "cross_track_p95_m": 0.2802734375000034,
+    "fixture_stand_off_min_m": 14.035931860311287,
+    "normal_arming": true,
+    "landed": true,
+    "disarmed": true,
+    "source_indexed_association": true,
+    "visual_review": "All three timed recovery intervals show the deck concealing the target, then the selected car reappearing.",
+    "preview": {
+      "bytes": 6432097,
+      "codec": "H.264",
+      "width": 640,
+      "height": 360,
+      "fps": 24,
+      "fast_start": true,
+      "playback": "Original wall-time cadence; no speed-up"
+    }
+  },
+  "long_bridge": {
+    "run": "m7-hitl-open-road-bridge-01",
+    "passed": false,
+    "reviewed_seconds_after_handover": 48.998549037,
+    "target_speed_mps": 12,
+    "recovered_gaps_seconds": [
+      2.406437,
+      0.313562
+    ],
+    "terminal_selected_missing_seconds": 3.283301055,
+    "behind_fraction": 1.0,
+    "cross_track_p95_m": 0.7091674804687468,
+    "fixture_stand_off_max_m": 86.48424006417663,
+    "cleanup_landed_and_disarmed": true,
+    "visual_review": "Target hidden by bridge then correctly recovered. Aircraft slows toward a stop while target continues, target becomes small and usable observations are lost. Latched hold and normal landing follow. Recovery does not constitute sustained-following success.",
+    "preview": {
+      "bytes": 4068176,
+      "codec": "H.264",
+      "width": 640,
+      "height": 360,
+      "fps": 24,
+      "fast_start": true,
+      "playback": "Original wall-time cadence; no speed-up"
+    }
+  },
+  "six_car_bridge": {
+    "run": "m7-hitl-open-road-six-cars-bridge-01",
+    "passed": false,
+    "reviewed_seconds_after_handover": 49.003137068,
+    "target_speed_mps": 12,
+    "cars_including_target": 6,
+    "recovered_gaps_seconds": [
+      2.216493
+    ],
+    "terminal_selected_missing_seconds": 3.661732931,
+    "behind_fraction": 1.0,
+    "cross_track_p95_m": 0.8787841796874964,
+    "fixture_stand_off_max_m": 86.01101256406047,
+    "cleanup_landed_and_disarmed": true,
+    "physical_identity_visual_review": "Sampled post-bridge frames show the original central car recovered between the five surrounding cars. No substitution was observed in review; sustained following still failed.",
+    "failure": "Guidance reacquisition followed by motion-filter rejections and terminal loss; existing hold and landing preserved.",
+    "preview": {
+      "bytes": 4050267,
+      "codec": "H.264",
+      "width": 640,
+      "height": 360,
+      "fps": 24,
+      "fast_start": true,
+      "playback": "Original wall-time cadence; no speed-up"
+    }
+  },
+  "guidance_reacquisition_follow_up": {
+    "status": "fixed locally; native regressions and single-car/crowded bridge flights passed",
+    "source": "src/services/guidance/code/estimation/motion.cpp",
+    "evidence": "Old maximum reacquisition gap was 1.5 seconds, shorter than configured 3-second loss window. Longer gaps reset estimated velocity to zero (initial velocity variance was already nonzero). Recovered moving observations then triggered innovation rejections.",
+    "next_work": "Qualification on further speeds, viewpoints and independently identifiable vehicles remains pending; no general ReID benchmark claim.",
+    "implementation": "Motion-estimator retention follows configured loss timeout, while command-estimate freshness remains 0.35 seconds. Lost-track ReID requires proximity to the prediction or last confident observed box plus existing appearance, motion and ambiguity gates."
+  },
+  "long_bridge_after_guidance_fix": {
+    "run": "m7-hitl-open-road-bridge-02",
+    "passed": true,
+    "timed_following_seconds": 61,
+    "target_speed_mps": 12,
+    "recovered_gaps_seconds": [
+      2.134339,
+      0.3668,
+      0.438211
+    ],
+    "selected_visible_fraction": 0.9592641261498029,
+    "behind_fraction": 1.0,
+    "cross_track_p95_m": 1.1730346679687464,
+    "fixture_stand_off_max_m": 42.633255571083,
+    "normal_arming": true,
+    "landed": true,
+    "disarmed": true,
+    "loss_hold_passed": true,
+    "running_binary_sha256": "1802c8d0911cf8783ebd701b092cd5ce547d7c64fc839de91d604a0ac3caf9d2",
+    "physical_identity_visual_review": "Sampled recording shows bridge occlusion, recovery of the original car, controlled closing of the increased gap and stable following through 70 seconds after readiness.",
+    "preview": {
+      "bytes": 6343660,
+      "codec": "H.264",
+      "width": 640,
+      "height": 360,
+      "fps": 24,
+      "fast_start": true,
+      "playback": "Original wall-time cadence; no speed-up"
+    }
+  },
+  "six_car_bridge_guidance_only_retest": {
+    "run": "m7-hitl-open-road-six-cars-bridge-02",
+    "passed": false,
+    "motion_rejections": 3,
+    "cleanup_landed_and_disarmed": true,
+    "physical_identity_switch_observed": true,
+    "visual_evidence": "Before the central car emerged, selected ID 1 was assigned to the front-right car at about 42.6 seconds after readiness; central car then received a new ID.",
+    "follow_up": "Require image-region proximity as well as appearance and Mahalanobis gates for lost-track recovery. Do not relax flight loss/freshness checks."
+  },
+  "six_car_bridge_prediction_gate_retest": {
+    "run": "m7-hitl-open-road-six-cars-bridge-03",
+    "passed": false,
+    "cleanup_landed_and_disarmed": true,
+    "failure": "Prediction-only recovery proximity guard prevented the prior wrong-car recovery, but drift after partially occluded boxes blocked the central car; loss hold remained active.",
+    "geometry_replay": "Recorded observation replay shows downward box-prediction drift during occlusion. Recovery now also checks overlap with the last confident observed box; appearance, motion and ambiguity gates remain active."
+  },
+  "six_car_bridge_after_fixes": {
+    "run": "m7-hitl-open-road-six-cars-bridge-04",
+    "passed": true,
+    "timed_following_seconds": 61,
+    "target_speed_mps": 12,
+    "cars_including_target": 6,
+    "recovered_gaps_seconds": [
+      2.064849
+    ],
+    "selected_visible_fraction": 0.9714656290531777,
+    "behind_fraction": 1.0,
+    "cross_track_p95_m": 0.8905029296874964,
+    "fixture_stand_off_max_m": 37.87563392637857,
+    "normal_arming": true,
+    "landed": true,
+    "disarmed": true,
+    "loss_hold_passed": true,
+    "guidance_binary_sha256": "1802c8d0911cf8783ebd701b092cd5ce547d7c64fc839de91d604a0ac3caf9d2",
+    "tracker_binary_sha256": "85f31e5f63891b7423db0a89cd103afee665e41a7ad59982240951e05dc868d5",
+    "physical_identity_visual_review": "Recording samples at 2, 39, 41.5, 43.5, 50 and 70 seconds show the original central car, bridge occlusion, recovery of that same central car among the five surrounding cars, and continued following.",
+    "preview": {
+      "bytes": 6442975,
+      "codec": "H.264",
+      "width": 640,
+      "height": 360,
+      "fps": 24,
+      "fast_start": true,
+      "playback": "Original wall-time cadence; no speed-up"
+    }
+  }
+}
