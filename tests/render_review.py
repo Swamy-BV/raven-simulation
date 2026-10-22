@@ -280,7 +280,8 @@ def main():
         context.rectangle(8, 8, 259, 34)
         context.fill()
         text(context, 15, 22, "Raven | NXP i.MX95" if hardware else "Raven | Visual Tracking", size=11)
-        text(context, 208, 22, f"{vehicle_count} cars" if vehicle_count else "AirSim", size=9)
+        vehicle_label = "car" if vehicle_count == 1 else "cars"
+        text(context, 208, 22, f"{vehicle_count} {vehicle_label}" if vehicle_count else "AirSim", size=9)
         details = ("PX4 M7 | Linux A55 | NPU | ROS 2 | AirSim HITL" if hardware
                    else "PX4 SITL | Linux vision | ROS 2 | AirSim")
         text(context, 15, 35, details, size=8.5)

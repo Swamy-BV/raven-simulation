@@ -1,0 +1,97 @@
+{
+  "date": "2026-10-22",
+  "controller": "i.MX95 Cortex-M7 PX4 HITL, system ID 1",
+  "companion": "i.MX95 Linux, Neutron YOLOv8s, ROS 2 DDS guidance",
+  "simulation": "Windows ProjectAirSim 1.0.1; GPU rendering and NVENC video",
+  "complex_tracking_qualified": false,
+  "rear_following": {
+    "source_profile": "scenarios/hitl-rear-follow.jsonc",
+    "tracker": "installed per-class baseline",
+    "passed": true,
+    "timed_following_seconds": 61,
+    "target_speed_limit_mps": 12,
+    "same_selected_id": true,
+    "rear_bearing_p95_degrees": 3.193143523162321,
+    "cross_track_p95_m": 1.0542985856725,
+    "normal_arming": true,
+    "loss_hold_test_passed": true,
+    "landed": true,
+    "disarmed": true,
+    "recording": {
+      "width": 1280,
+      "height": 720,
+      "frames": 2908,
+      "frames_with_tracks": 2905,
+      "duration_seconds": 60.97711111111111,
+      "decoder": "nvh264dec",
+      "encoder": "nvh264enc",
+      "playback": "Original wall-time cadence; no speed-up"
+    }
+  },
+  "canopy_occlusion": {
+    "source_profile": "scenarios/hitl-rear-occlusion.jsonc",
+    "tracker": "matched develop packages, class-independent association, no camera compensation",
+    "passed": false,
+    "same_identity_recovered": false,
+    "new_id_observed_after_seconds": 1.197034,
+    "following_before_hold_seconds": 28.003610657,
+    "normal_arming": true,
+    "cleanup_landed_and_disarmed": true
+  },
+  "camera_motion_experiment": {
+    "commit": "0689621",
+    "branch": "experiment/camera-motion-compensation",
+    "promoted_to_develop": false,
+    "native_state_covariance_and_image_motion_tests_passed": true,
+    "yocto_quality_and_package_checks_passed": true,
+    "live_canopy_recovery_passed": false,
+    "live_rear_following_passed": false,
+    "visible_detection_identity_switch": true,
+    "bounded_estimator_median_ms": 33.612615,
+    "bounded_estimator_p95_ms": 43.225863,
+    "tracker_cpu_one_core_percent": 40.10611607154792,
+    "peak_tracker_memory_mib": 25.84375,
+    "note": "Sparse similarity compensation added to XYAH ByteTrack; not full BoT-SORT. Raw detector replay without compensation retained the selected ID across the visible-frame live failure."
+  },
+  "urban_challenge": {
+    "source_profile": "scenarios/hitl-urban-challenge.jsonc",
+    "passed": false,
+    "moving_cars": 21,
+    "target_straight_speed_limit_mph": 40,
+    "gate_seconds": 180,
+    "failure": "Selected identity lost near U-turn; normal failure landing and disarm. Earlier braking/headway changes also failed and were not promoted."
+  },
+  "checks": {
+    "scenario_profiles": 17,
+    "offline_metric_and_yaw_unit_tests": 6,
+    "baseline_bytetrack_and_tracker_yocto_packages": true,
+    "normal_board_services_restored": true,
+    "temporary_m7_parameters_restored": true
+  },
+  "staging_failure": {
+    "counted_as_occlusion_test": false,
+    "cause": "Old dependency .deb used with newer tracker structure in a temporary runtime",
+    "resolution": "Explicitly build bytetrack and target-tracker packages together; verify matching structure layouts before staging",
+    "code_workaround_added": false
+  },
+  "next_steps": [
+    "Qualify a vehicle-specific appearance encoder on Neutron; combine appearance with spatial and motion gating for same-object recovery.",
+    "Use a full evaluated association implementation; compare motion-only OC-SORT and appearance-assisted BoT-SORT/Deep OC-SORT on identical recorded detections.",
+    "Evaluate calibrated camera/pose-assisted target motion and turn-aware state estimation; do not replace observations with unmarked predictions.",
+    "Evaluate visibility-aware trajectory control after identity is reliable; keep the existing selected-loss hold until recovery is qualified.",
+    "Add rendered actor-identity ground truth and HOTA/IDF1 evaluation for crossings and visually similar cars; vary vehicle appearance as well as retaining identical-car challenges."
+  ],
+  "references": [
+    "https://github.com/NirAharon/BoT-SORT",
+    "https://github.com/noahcao/OC_SORT",
+    "https://github.com/GerardMaggiolino/Deep-OC-SORT",
+    "https://arxiv.org/abs/2302.04708",
+    "https://github.com/JonathonLuiten/TrackEval"
+  ],
+  "measurement_limits": [
+    "Rear-formation references use elapsed-time fixture commands and asynchronous aircraft poses, not exact render-tick ground truth.",
+    "Stable track ID alone does not establish correct physical identity among the 21 cloned Car_01 actors.",
+    "A one-minute single-car rear-following pass is not an occlusion or multi-car tracking pass."
+  ],
+  "recordings_are_local": true
+}

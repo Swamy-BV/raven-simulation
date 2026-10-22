@@ -2,6 +2,7 @@
 import unittest
 
 from follow_metrics import Series, projection_metrics, formation_error
+from hitl_metrics import identity_evidence
 
 
 class MetricTests(unittest.TestCase):
@@ -10,6 +11,17 @@ class MetricTests(unittest.TestCase):
         self.assertEqual(formation_error([0, 10], [1, 0]), (False, 10, 90))
         self.assertEqual(formation_error([10, 0], [1, 0]), (False, 0, 180))
         self.assertEqual(formation_error([0, -10], [0, 1]), (True, 0, 0))
+
+    def test_occlusion_evidence_requires_same_id_and_continuous_input(self):
+        source = [{"source_ns": i * 100_000_000,
+                   "tracks": [{"id": "selected"}] if i in (1, 5) else []}
+                  for i in range(1, 6)]
+        self.assertEqual(identity_evidence(source, "selected")[1], [.4])
+        # A detector/tracker publication outage is not an occlusion test.
+        self.assertEqual(identity_evidence([source[0], source[-1]], "selected")[1], [])
+        # Reappearance under another ID is a failure to recover selected identity.
+        source[-1]["tracks"] = [{"id": "replacement"}]
+        self.assertEqual(identity_evidence(source, "selected")[1], [])
 
     def test_interpolates_capture_time(self):
         series = Series([(0, [0, 0, 0]), (100_000_000, [10, 20, 30])])

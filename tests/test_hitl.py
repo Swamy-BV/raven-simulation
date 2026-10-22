@@ -44,7 +44,9 @@ class HitlTests(unittest.TestCase):
         output = Path("/tmp/raven-hitl-results") / time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         output.mkdir(parents=True, exist_ok=False)
         track_log = (output / "tracks.jsonl").open("w")
+        detection_log = (output / "detections.jsonl").open("w")
         health_log = (output / "health.jsonl").open("w")
+        tracking_log = (output / "tracking-health.jsonl").open("w")
         attitude_log = (output / "attitude.jsonl").open("w")
         observation_log = (output / "observation-health.jsonl").open("w")
         setpoint_log = (output / "setpoints.jsonl").open("w")
@@ -106,8 +108,13 @@ class HitlTests(unittest.TestCase):
                     "level": diagnostic.level[0] if isinstance(diagnostic.level, bytes) else int(diagnostic.level),
                     "reason": diagnostic.message,
                     "values": {v.key: v.value for v in diagnostic.values}}) + "\n")
-            if key == "tracks":
-                track_log.write(json.dumps({
+            if key == "tracking_health" and message.status:
+                tracking_log.write(json.dumps({
+                    "received_ros_ns": node.get_clock().now().nanoseconds,
+                    "values": {v.key: v.value for v in message.status[0].values}}) + "\n")
+            if key in ("tracks", "detections"):
+                destination = track_log if key == "tracks" else detection_log
+                destination.write(json.dumps({
                     "source_ns": message.header.stamp.sec * 10**9 + message.header.stamp.nanosec,
                     "tracks": [{"id": d.id,
                                 "class_id": d.results[0].hypothesis.class_id if d.results else None,
@@ -142,8 +149,14 @@ class HitlTests(unittest.TestCase):
                 DiagnosticArray, guidance + "/observation_health",
                 lambda m: receive("observation_health", m), qos_profile_sensor_data))
             subs.append(node.create_subscription(
+                DiagnosticArray, "/raven/vehicle_1/perception/tracking_health",
+                lambda m: receive("tracking_health", m), 10))
+            subs.append(node.create_subscription(
                 Detection2DArray, "/raven/vehicle_1/perception/tracks",
                 lambda m: receive("tracks", m), 10))
+            subs.append(node.create_subscription(
+                Detection2DArray, "/raven/vehicle_1/perception/detections",
+                lambda m: receive("detections", m), 10))
         commands = node.create_publisher(VehicleCommand, "/fmu/in/vehicle_command", 10)
         modes = node.create_publisher(OffboardControlMode, "/fmu/in/offboard_control_mode", 10)
         targets = node.create_publisher(TrajectorySetpoint, "/fmu/in/trajectory_setpoint", 10)
@@ -471,7 +484,9 @@ class HitlTests(unittest.TestCase):
             (output / "following.json").write_text(json.dumps(follow_records) + "\n")
             (output / "positions.json").write_text(json.dumps(records) + "\n")
             track_log.close()
+            detection_log.close()
             health_log.close()
+            tracking_log.close()
             attitude_log.close()
             observation_log.close()
             setpoint_log.close()

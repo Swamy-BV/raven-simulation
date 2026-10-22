@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "scene_id": "M7HitlRearFollow",
+  "aircraft": {
+    "name": "CameraDrone",
+    "xyz": "600 -294 -1.2",
+    "rpy_deg": "0 0 90"
+  },
+  "target": {
+    "name": "TargetCar",
+    "asset": "Car_01",
+    "display_name": "ScenarioSedan",
+    "visual_yaw_offset_deg": -90,
+    "height_ned_m": -1.03
+  },
+  "route": {
+    "type": "segments",
+    "start_xy_m": [
+      600,
+      -280
+    ],
+    "start_heading_deg": 90,
+    "segments": [
+      {
+        "type": "line",
+        "length_m": 600
+      },
+      {
+        "type": "arc",
+        "radius_m": 80,
+        "turn_deg": 180
+      },
+      {
+        "type": "line",
+        "length_m": 600
+      },
+      {
+        "type": "arc",
+        "radius_m": 80,
+        "turn_deg": 180
+      }
+    ]
+  },
+  "target_speed_mps": 12.0,
+  "target_start_delay_s": 5,
+  "target_start_on_ready": true,
+  "following_parameters": {
+    "ground_z": 0.2,
+    "target_position_stddev": 0.5,
+    "target_acceleration_noise": 3.0,
+    "align_with_motion": false,
+    "minimum_heading_speed": 1.0,
+    "follow_distance": 14.0,
+    "position_gain": 0.4,
+    "max_speed": 23.0,
+    "max_acceleration": 6.0,
+    "max_jerk": 4.0,
+    "max_yaw_rate": 1.2,
+    "max_displacement": 1200.0,
+    "max_target_range": 80.0,
+    "follow_path": true,
+    "heading_response_seconds": 1.0
+  },
+  "camera": {
+    "pitch_down_deg": 22.0,
+    "horizontal_fov_deg": 80.2140913183,
+    "stabilized": true,
+    "render_width": 1280,
+    "capture_rate_hz": 60
+  },
+  "vehicle_acceleration_mps2": 1.5,
+  "vehicle_lateral_acceleration_mps2": 2.0,
+  "flight_controller": "hitl",
+  "route_laps": 3,
+  "traffic_start_on_ready": true,
+  "px4_parameters": {
+    "MPC_XY_VEL_MAX": 23.0,
+    "MPC_XY_CRUISE": 20.0,
+    "MPC_ACC_HOR": 6.0,
+    "MPC_ACC_HOR_MAX": 8.0,
+    "MPC_TILTMAX_AIR": 45.0,
+    "MPC_YAWRAUTO_MAX": 90.0
+  },
+  "acceptance": {
+    "height_m": 4.5,
+    "minimum_target_speed_mps": 11.0,
+    "following_seconds": 61
+  },
+  "vision_parameters": {
+    "model": "yolov8s-neutron"
+  },
+  "course": {
+    "type": "continuous",
+    "surface_z_m": -1.0,
+    "road_width_m": 20,
+    "grass_texture": "aerial_grass_rock",
+    "asphalt_texture": "asphalt_02",
+    "tree_asset": "Tree_01",
+    "small_house_asset": "Small_House_Prefab_01",
+    "house_asset": "Medium_House_Prefab_01",
+    "centerline": false,
+    "lane_markings_m": [
+      -6,
+      -2,
+      2,
+      6
+    ],
+    "building_offset_m": 42,
+    "trees": {
+      "spacing_m": 32,
+      "offset_m": 20,
+      "scale": 0.6
+    }
+  },
+  "scenery": []
+}
