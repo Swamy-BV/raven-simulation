@@ -30,6 +30,8 @@ The `hitl-suburban-pursuit` profile adds sweeping S-bends and a roundabout with 
 
 The `hitl-highway-traffic` profile uses a three-lane loop with thirteen cars, a 40 mph straight-line speed limit and trees on both verges. Traffic fixtures stay separate from PX4-controlled flight. The review HUD groups estimated target motion, measured/commanded drone motion and processing health in a compact bottom strip.
 
+The `hitl-fleet-weave` profile combines three gradual lane changes, a slower fleet that queues before the first roundabout, two timed crossing cars, and two roundabouts. Fixture schedules use smooth distance-based lane changes and stop-and-hold trajectories; the aircraft still follows only board perception.
+
 To add a scenario, add a profile under `scenarios/` and select it in the bridge command. Rounded rectangles and closed segment routes (lines, arcs and tangent Bezier transitions) are supported. New environments also require their assets to be installed in AirSim. This does not imply arbitrary actors or environments already work.
 
 This uses **IAMAI ProjectAirSim v1.0.1**, the continuation linked by Microsoft's original AirSim project. Source and environment pins are in `versions.env`. The PX4 checkout must match Raven's `px4_msgs`; do not substitute an older PX4 release to match an example.

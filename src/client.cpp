@@ -128,7 +128,7 @@ void Client::Load(const std::filesystem::path& directory) {
                            trajectory.at("pose_z").at(i).get<double>()},
                           trajectory.at("pose_yaw").at(i).get<double>()});
       }
-      actor.motion.emplace(std::move(points));
+      actor.motion.emplace(std::move(points), trajectory.value("loop", true));
     }
     actor.display = Spawn(actor);
     actors_.push_back(std::move(actor));

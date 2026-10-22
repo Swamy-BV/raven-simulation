@@ -1,0 +1,72 @@
+{
+  "scenario": "hitl-fleet-weave",
+  "passed": true,
+  "controller": "i.MX95 Cortex-M7 PX4 HITL, system ID 1",
+  "companion": "i.MX95 Linux, NPU YOLOv8s, ROS 2 DDS guidance",
+  "physics": "Windows ProjectAirSim 1.0.1",
+  "scene_cars": 15,
+  "fleet_cars": 12,
+  "crossing_cars": 2,
+  "lane_changes": 3,
+  "roundabouts": 2,
+  "target_speed_limit_mph": 40,
+  "following_seconds": 150.0,
+  "following_fraction": 1.0,
+  "selected_identity_count": 1,
+  "normal_arming_checks": true,
+  "maximum_hover_error_m": 0.3073383855376853,
+  "identity_loss_hold_and_braking_passed": true,
+  "landed": true,
+  "disarmed": true,
+  "traffic_clearance_check": {
+    "sample_step_s": 0.05,
+    "duration_s": 175,
+    "body_length_m": 5.6,
+    "body_width_m": 2.7,
+    "overlaps": [],
+    "minimum_center_distance_m": 3.8699271245056206
+  },
+  "runtime_fleet_holds_verified": 12,
+  "recording": {
+    "frames": 4556,
+    "with_tracks": 4553,
+    "width": 1280,
+    "height": 720,
+    "unmatched_frames": 0,
+    "decoder": "nvh264dec",
+    "encoder": "nvh264enc",
+    "playback": "Original wall-time cadence; no speed-up",
+    "hud_layout": "Compact hardware badge, status pill and grouped bottom data dock"
+  },
+  "approximate_video_events_seconds": {
+    "lane_changes": [
+      12,
+      23,
+      43
+    ],
+    "crossings": [
+      29,
+      99
+    ],
+    "roundabout_entries": [
+      57,
+      116
+    ]
+  },
+  "checks": {
+    "windows_cpp17_warnings_as_errors": true,
+    "offline_scenario_checks": 14,
+    "negative_configuration_checks": 3,
+    "clang_format": true,
+    "cmake_lint": true,
+    "shellcheck": true,
+    "python_offline_tests": 5
+  },
+  "notes": [
+    "Car maneuvers are scenario fixtures; only PX4 controls the aircraft, using board vision and guidance.",
+    "The fleet slows and stops in queues before the first roundabout, allowing the selected car to pass.",
+    "Crossings are scheduled at checked gaps. This is not autonomous traffic avoidance.",
+    "All 12 fleet cars held their final C++ fixture poses for a checked 20-second window.",
+    "Normal board services and saved M7 parameters restored after testing."
+  ]
+}

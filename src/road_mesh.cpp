@@ -150,6 +150,97 @@ std::vector<RoadPoint> Circle(const RoadPoint& centre, double radius) {
   return result;
 }
 
+Json Roundabouts(const Json& course) {
+  auto result = course.value("roundabouts", Json::array());
+  if (course.contains("roundabout")) {
+    result.push_back(course.at("roundabout"));
+  }
+  if (!result.is_array() || result.size() > 8) {
+    throw std::runtime_error("Invalid roundabout list");
+  }
+  return result;
+}
+
+struct RoadLink {
+  RoadPoint start;
+  RoadPoint end;
+  double width;
+};
+
+std::vector<RoadLink> RoadLinks(const Json& course) {
+  std::vector<RoadLink> result;
+  for (const auto& item : course.value("crossroads", Json::array())) {
+    RoadLink link{item.at("start_xy_m").get<RoadPoint>(),
+                  item.at("end_xy_m").get<RoadPoint>(),
+                  item.value("width_m", 8.0)};
+    const double length =
+        std::hypot(link.end[0] - link.start[0], link.end[1] - link.start[1]);
+    if (!std::isfinite(length) || length < 10 || length > 500 ||
+        !std::isfinite(link.width) || link.width < 4 || link.width > 14) {
+      throw std::runtime_error("Invalid crossing road");
+    }
+    for (const auto& point : {link.start, link.end}) {
+      for (const double value : point) {
+        if (!std::isfinite(value) || std::abs(value) > 10000) {
+          throw std::runtime_error("Invalid crossing coordinate");
+        }
+      }
+    }
+    result.push_back(link);
+  }
+  return result;
+}
+
+bool ClearOfLinks(const RoadPoint& point, const std::vector<RoadLink>& links,
+                  const double margin) {
+  for (const auto& link : links) {
+    const double dx = link.end[0] - link.start[0],
+                 dy = link.end[1] - link.start[1];
+    const double t = std::clamp(
+        ((point[0] - link.start[0]) * dx + (point[1] - link.start[1]) * dy) /
+            (dx * dx + dy * dy),
+        0.0, 1.0);
+    if (std::hypot(point[0] - link.start[0] - t * dx,
+                   point[1] - link.start[1] - t * dy) <
+        link.width / 2 + margin) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void CrossingRoad(std::array<Surface, 5>& surfaces, const RoadLink& link,
+                  const std::vector<Opening>& openings) {
+  const double dx = link.end[0] - link.start[0],
+               dy = link.end[1] - link.start[1], length = std::hypot(dx, dy);
+  const RoadPoint right{dy / length, -dx / length};
+  const int count = static_cast<int>(std::ceil(length));
+  const auto point = [&](const int index, const double offset) {
+    const double t = static_cast<double>(index) / count;
+    return RoadPoint{link.start[0] + t * dx + right[0] * offset,
+                     link.start[1] + t * dy + right[1] * offset};
+  };
+  for (int i = 0; i < count; ++i) {
+    const double half = link.width / 2;
+    surfaces[1].Quad(point(i, -half), point(i, half), point(i + 1, half),
+                     point(i + 1, -half), .02);
+    const auto center = point(i, 0);
+    const bool opening =
+        std::any_of(openings.begin(), openings.end(), [&](const Opening& item) {
+          return std::hypot(center[0] - item.center[0],
+                            center[1] - item.center[1]) < item.radius;
+        });
+    if (!opening) {
+      for (const double sign : {-1.0, 1.0}) {
+        surfaces[3].Quad(point(i, sign * (half - .3)),
+                         point(i, sign * (half - .15)),
+                         point(i + 1, sign * (half - .15)),
+                         point(i + 1, sign * (half - .3)), .025);
+      }
+    }
+  }
+}
+
 Json Material(const std::string& name, const Json& color) {
   return {{"name", name},
           {"doubleSided", true},
@@ -202,8 +293,10 @@ void WriteRoadMesh(const std::vector<RoadPoint>& points, const Json& course,
     Strip(surfaces[3], points, offset - .06, offset + .06, .026, true,
           openings);
   }
-  if (course.contains("roundabout")) {
-    const auto roundabout = course.at("roundabout");
+  for (const auto& link : RoadLinks(course)) {
+    CrossingRoad(surfaces, link, openings);
+  }
+  for (const auto& roundabout : Roundabouts(course)) {
     const auto center = roundabout.at("center_xy_m").get<RoadPoint>();
     for (const auto value : center) {
       if (!std::isfinite(value) || std::abs(value) > 10000) {
@@ -327,6 +420,8 @@ Json RoadScenery(const std::vector<RoadPoint>& points, const Json& course) {
   Json result = Json::array();
   double distance = 0;
   unsigned count = 0;
+  const auto roundabouts = Roundabouts(course);
+  const auto links = RoadLinks(course);
   const double setback = course.value("building_offset_m", 32.0);
   if (!std::isfinite(setback) || setback < 24 || setback > 80) {
     throw std::runtime_error("Invalid building setback");
@@ -344,13 +439,13 @@ Json RoadScenery(const std::vector<RoadPoint>& points, const Json& course) {
     const RoadPoint p{points[i][0] - side * std::sin(yaw) * setback,
                       points[i][1] + side * std::cos(yaw) * setback};
     // Avoid placing houses inside the island or across a nearby road section.
-    bool clear = true;
-    if (course.contains("roundabout")) {
-      const auto island =
-          course.at("roundabout").at("center_xy_m").get<RoadPoint>();
-      const double clearance =
-          course.at("roundabout").at("radius_m").get<double>() + 24;
-      clear = std::hypot(p[0] - island[0], p[1] - island[1]) >= clearance;
+    bool clear = ClearOfLinks(p, links, 15);
+    for (const auto& island : roundabouts) {
+      const auto center = island.at("center_xy_m").get<RoadPoint>();
+      if (std::hypot(p[0] - center[0], p[1] - center[1]) <
+          island.at("radius_m").get<double>() + 24) {
+        clear = false;
+      }
     }
     for (const auto& road : points) {
       if (std::hypot(p[0] - road[0], p[1] - road[1]) < 24) {
@@ -373,10 +468,11 @@ Json RoadScenery(const std::vector<RoadPoint>& points, const Json& course) {
          {"scale",
           tree ? Json::array({.65, .65, .65}) : Json::array({.75, .75, .75})}});
   }
-  if (course.contains("roundabout")) {
-    const auto center = course.at("roundabout").at("center_xy_m");
+  unsigned island_index = 0;
+  for (const auto& island : roundabouts) {
+    const auto center = island.at("center_xy_m");
     result.push_back(
-        {{"name", "IslandTree"},
+        {{"name", "IslandTree" + std::to_string(island_index++)},
          {"asset", course.at("tree_asset")},
          {"position",
           {center[0], center[1], course.at("surface_z_m").get<double>() - .15}},
@@ -406,7 +502,7 @@ Json RoadScenery(const std::vector<RoadPoint>& points, const Json& course) {
           continue;
         }
         travelled = 0;
-        bool clear = true;
+        bool clear = ClearOfLinks(row[i], links, 8);
         for (const auto& road : points) {
           if (std::hypot(row[i][0] - road[0], row[i][1] - road[1]) <
               course.value("road_width_m", 14.0) / 2 + 8) {

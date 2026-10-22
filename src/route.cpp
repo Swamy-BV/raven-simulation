@@ -132,4 +132,83 @@ std::vector<RoadPoint> OffsetPath(const std::vector<RoadPoint>& points,
   result.back() = result.front();
   return result;
 }
+
+std::vector<RoadPoint> ChangeLanes(const std::vector<RoadPoint>& points,
+                                   const nlohmann::json& changes) {
+  if (!changes.is_array() || changes.size() > 20) {
+    throw std::runtime_error("Invalid lane-change schedule");
+  }
+  double previous_end = 0;
+  for (const auto& change : changes) {
+    const double start = change.at("start_m").get<double>();
+    const double end = change.at("end_m").get<double>();
+    const double offset = change.at("offset_m").get<double>();
+    if (!std::isfinite(start) || !std::isfinite(end) ||
+        !std::isfinite(offset) || start < previous_end || end - start < 20 ||
+        std::abs(offset) > 5) {
+      throw std::runtime_error(
+          "Lane changes need ordered distances and bounded offsets");
+    }
+    previous_end = end;
+  }
+  if (changes.empty()) {
+    return points;
+  }
+  if (std::abs(changes.back().at("offset_m").get<double>()) > 1e-6) {
+    throw std::runtime_error("Repeated route must return to its original lane");
+  }
+  const auto right = OffsetPath(points, 1);
+  auto result = points;
+  double distance = 0;
+  for (std::size_t i = 0; i < points.size(); ++i) {
+    if (i > 0) {
+      distance += Distance(points[i - 1], points[i]);
+    }
+    double offset = 0;
+    for (const auto& change : changes) {
+      const double start = change.at("start_m").get<double>();
+      const double end = change.at("end_m").get<double>();
+      const double next = change.at("offset_m").get<double>();
+      if (distance < start) {
+        break;
+      }
+      if (distance >= end) {
+        offset = next;
+        continue;
+      }
+      const double t = (distance - start) / (end - start);
+      const double blend = t * t * t * (10 + t * (-15 + 6 * t));
+      offset += blend * (next - offset);
+      break;
+    }
+    for (std::size_t axis = 0; axis < 2; ++axis) {
+      result[i][axis] += offset * (right[i][axis] - points[i][axis]);
+    }
+  }
+  if (previous_end > distance) {
+    throw std::runtime_error("Lane change extends beyond route");
+  }
+  return result;
+}
+
+void StopAfterDistance(std::vector<RoadPoint>& points, const double distance) {
+  if (!std::isfinite(distance) || distance < 10) {
+    throw std::runtime_error("Invalid stopping distance");
+  }
+  double travelled = 0;
+  for (std::size_t i = 1; i < points.size(); ++i) {
+    const double step = Distance(points[i - 1], points[i]);
+    if (travelled + step >= distance) {
+      const double fraction = (distance - travelled) / step;
+      for (std::size_t axis = 0; axis < 2; ++axis) {
+        points[i][axis] = points[i - 1][axis] +
+                          fraction * (points[i][axis] - points[i - 1][axis]);
+      }
+      points.resize(i + 1);
+      return;
+    }
+    travelled += step;
+  }
+  throw std::runtime_error("Stopping distance extends beyond trajectory");
+}
 }  // namespace raven::simulation

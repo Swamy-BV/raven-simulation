@@ -128,8 +128,15 @@ std::vector<Json> ActorProfiles(const Json& settings) {
     auto target = settings.at("target");
     target.update(actor);
     profile["target"] = target;
-    profile["route"] =
-        InsetRoute(settings.at("route"), actor.value("route_inset_m", 0.0));
+    profile["route"] = InsetRoute(actor.value("route", settings.at("route")),
+                                  actor.value("route_inset_m", 0.0));
+    profile["lane_changes"] = actor.value("lane_changes", Json::array());
+    profile["target_start_delay_s"] = actor.value(
+        "start_delay_s", settings.at("target_start_delay_s").get<double>());
+    profile.erase("stop_after_m");
+    if (actor.contains("stop_after_m")) {
+      profile["stop_after_m"] = actor.at("stop_after_m");
+    }
     profile["target_speed_mps"] =
         actor.value("speed_mps", settings.at("target_speed_mps").get<double>());
     profile["phase_fraction"] = actor.value("phase_fraction", 0.0);
@@ -212,6 +219,9 @@ Json Trajectory(const Json& profile) {
     point[0] += offset[0];
     point[1] += offset[1];
   }
+  points.push_back(points.front());
+  points = ChangeLanes(points, profile.value("lane_changes", Json::array()));
+  points.pop_back();
   const auto laps = profile.value("route_laps", 1U);
   if (laps == 0 || laps > 10) {
     throw std::runtime_error("Route laps must be 1..10");
@@ -221,8 +231,12 @@ Json Trajectory(const Json& profile) {
     points.insert(points.end(), lap.begin(), lap.end());
   }
   points.push_back(points.front());
+  const bool repeat = !profile.contains("stop_after_m");
+  if (!repeat) {
+    StopAfterDistance(points, profile.at("stop_after_m").get<double>());
+  }
   const auto speeds = Speeds(points, profile, speed);
-  Json t = {{"name", profile.at("scene_id")}};
+  Json t = {{"name", profile.at("scene_id")}, {"loop", repeat}};
   double elapsed = delay;
   double heading =
       std::atan2(points[1][1] - points[0][1], points[1][0] - points[0][0]);
@@ -513,12 +527,14 @@ void ValidateScenario(const std::filesystem::path& profile,
     const auto trajectory = Trajectory(profiles[i]);
     const auto size = trajectory.at("time_sec").size();
     for (const auto& field : trajectory.items()) {
-      if (field.key() != "name" && field.value().size() != size) {
+      if (field.key() != "name" && field.key() != "loop" &&
+          field.value().size() != size) {
         throw std::runtime_error("Mismatched trajectory arrays");
       }
     }
-    if (trajectory.at("pose_x").front() != trajectory.at("pose_x").back() ||
-        trajectory.at("pose_y").front() != trajectory.at("pose_y").back()) {
+    if (trajectory.value("loop", true) &&
+        (trajectory.at("pose_x").front() != trajectory.at("pose_x").back() ||
+         trajectory.at("pose_y").front() != trajectory.at("pose_y").back())) {
       throw std::runtime_error("Street route is not closed");
     }
     const auto filename =
@@ -616,9 +632,11 @@ ScenarioRuntime GenerateScenario(const std::filesystem::path& profile,
     link["collision"] = {{"enabled", false}};
   }
   for (std::size_t i = 0; i < profiles.size(); ++i) {
-    actor["script"] = {{"loop", true},
-                       {"auto_start", true},
-                       {"trajectory", Trajectory(profiles[i])}};
+    auto trajectory = Trajectory(profiles[i]);
+    const bool repeat = trajectory.value("loop", true);
+    trajectory.erase("loop");
+    actor["script"] = {
+        {"loop", repeat}, {"auto_start", true}, {"trajectory", trajectory}};
     Write(directory / ActorFile(i), actor);
   }
   return runtime;

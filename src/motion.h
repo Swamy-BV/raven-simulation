@@ -15,10 +15,11 @@ struct MotionPoint {
 // follower.
 class Motion {
  public:
-  explicit Motion(std::vector<MotionPoint> points);
+  explicit Motion(std::vector<MotionPoint> points, bool repeat = true);
   MotionPoint At(double elapsed_seconds) const;
 
  private:
   std::vector<MotionPoint> points_;
+  bool repeat_;
 };
 }  // namespace raven::simulation

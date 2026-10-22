@@ -9,4 +9,7 @@ using RoadPoint = std::array<double, 2>;
 std::vector<RoadPoint> SegmentRoute(const nlohmann::json& route);
 std::vector<RoadPoint> OffsetPath(const std::vector<RoadPoint>& points,
                                   double offset);
+std::vector<RoadPoint> ChangeLanes(const std::vector<RoadPoint>& points,
+                                   const nlohmann::json& changes);
+void StopAfterDistance(std::vector<RoadPoint>& points, double distance);
 }  // namespace raven::simulation

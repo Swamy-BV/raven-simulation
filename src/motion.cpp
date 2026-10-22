@@ -7,7 +7,8 @@
 #include <utility>
 
 namespace raven::simulation {
-Motion::Motion(std::vector<MotionPoint> points) : points_(std::move(points)) {
+Motion::Motion(std::vector<MotionPoint> points, const bool repeat)
+    : points_(std::move(points)), repeat_(repeat) {
   if (points_.size() < 2 || points_.front().seconds != 0) {
     throw std::runtime_error("Motion needs a zero-based trajectory");
   }
@@ -27,7 +28,12 @@ MotionPoint Motion::At(double elapsed_seconds) const {
   if (!std::isfinite(elapsed_seconds) || elapsed_seconds < 0) {
     throw std::runtime_error("Invalid fixture elapsed time");
   }
-  const double time = std::fmod(elapsed_seconds, points_.back().seconds);
+  if (!repeat_ && elapsed_seconds >= points_.back().seconds) {
+    return points_.back();
+  }
+  const double time = repeat_
+                          ? std::fmod(elapsed_seconds, points_.back().seconds)
+                          : elapsed_seconds;
   const auto upper =
       std::upper_bound(points_.begin(), points_.end(), time,
                        [](double value, const MotionPoint& point) {
