@@ -41,5 +41,36 @@
   },
   "heading_configuration_note": "Experimental simulator-only initialization; PX4 can update declination during operation. Not a validated hardware calibration.",
   "board_after_test": "disarmed; normal media/inference/tracking/DDS services restored; guidance stopped; temporary controller parameters restored",
-  "overtaking_and_occlusion": "not validated"
+  "overtaking_and_occlusion": "not validated",
+  "high_graphics_three_car_run": {
+    "passed": true,
+    "controller": "physical i.MX95 M7 PX4 HITL",
+    "command_path": "ROS 2 DDS over RPMsg",
+    "cars": 3,
+    "model": "yolov8s-neutron",
+    "scene_graphics": "Epic scene detail, TAA, 16x anisotropic filtering",
+    "video_resolution": [
+      640,
+      360
+    ],
+    "source_encoder": "NVENC p4, 6 Mbps, no B frames",
+    "review_encoder": "NVENC p4, 8 Mbps",
+    "measured_target_mph_median": 40.56243742209196,
+    "moving_following_seconds": 61.0,
+    "selected_id_retained": true,
+    "following_fraction": 1.0,
+    "video_fps": 27.205481666507836,
+    "rejected_observations_max": 0,
+    "source_age_ms_median": 226.653237,
+    "normal_arming": true,
+    "identity_loss_hold_and_braking_passed": true,
+    "landed": true,
+    "disarmed": true,
+    "first_attempt": "Stopped before arming; estimator had not passed normal arming checks. Restarted estimator with previously validated simulated-compass settings before successful retry.",
+    "temporary_parameters_restored": true,
+    "normal_services_restored": true,
+    "video_seconds": 79.991333333,
+    "playback": "original wall-time cadence; no speed-up",
+    "scope": "one successful run; not a repeatability or all-conditions validation"
+  }
 }

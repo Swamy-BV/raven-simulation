@@ -41,7 +41,7 @@
     "changes_committed": true,
     "changes_pushed": false
   },
-  "next_step": "Fix selected visual identity continuity through bends using the saved detection and association evidence; preserve the validated HITL yaw settings and rerun the unchanged 61-second racetrack gate.",
+  "next_step": "Repeat the successful 61-second three-car 40 mph run to assess robustness; review bend centering and lateral smoothness before adding another behavior.",
   "experimental_wifi_relay_retained_in_source": false,
   "direct_usb_serial_experiment": {
     "target": "raven_frdm_hitl-serial",
@@ -515,5 +515,36 @@
       }
     ],
     "important_scene_correction": "Car asset origin is at the wheels; grounded the fixture instead of offsetting it by an assumed half-height."
+  },
+  "three_car_high_graphics": {
+    "passed": true,
+    "controller": "physical i.MX95 M7 PX4 HITL",
+    "command_path": "ROS 2 DDS over RPMsg",
+    "cars": 3,
+    "model": "yolov8s-neutron",
+    "scene_graphics": "Epic scene detail, TAA, 16x anisotropic filtering",
+    "video_resolution": [
+      640,
+      360
+    ],
+    "source_encoder": "NVENC p4, 6 Mbps, no B frames",
+    "review_encoder": "NVENC p4, 8 Mbps",
+    "measured_target_mph_median": 40.56243742209196,
+    "moving_following_seconds": 61.0,
+    "selected_id_retained": true,
+    "following_fraction": 1.0,
+    "video_fps": 27.205481666507836,
+    "rejected_observations_max": 0,
+    "source_age_ms_median": 226.653237,
+    "normal_arming": true,
+    "identity_loss_hold_and_braking_passed": true,
+    "landed": true,
+    "disarmed": true,
+    "first_attempt": "Stopped before arming; estimator had not passed normal arming checks. Restarted estimator with previously validated simulated-compass settings before successful retry.",
+    "temporary_parameters_restored": true,
+    "normal_services_restored": true,
+    "video_seconds": 79.991333333,
+    "playback": "original wall-time cadence; no speed-up",
+    "scope": "one successful run; not a repeatability or all-conditions validation"
   }
 }
