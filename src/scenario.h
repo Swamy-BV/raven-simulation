@@ -9,6 +9,8 @@ enum class FlightController { kSitl, kHitl };
 struct ScenarioRuntime {
   FlightController controller;
   bool stream_video_to_board;
+  int render_width;
+  int render_height;
 };
 
 ScenarioRuntime GenerateScenario(const std::filesystem::path& profile,

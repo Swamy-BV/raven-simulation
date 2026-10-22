@@ -14,7 +14,7 @@ class Video {
  public:
   Video(const std::string& host, const std::filesystem::path& directory,
         std::function<void(std::int64_t)> source_clock,
-        std::int64_t capture_clock_offset_ns);
+        std::int64_t capture_clock_offset_ns, int width, int height);
   ~Video();
   Video(const Video&) = delete;
   Video& operator=(const Video&) = delete;
@@ -34,6 +34,10 @@ class Video {
   std::ofstream encoded_log_;
   std::function<void(std::int64_t)> source_clock_;
   const std::int64_t capture_clock_offset_ns_;
+  const int width_;
+  const int height_;
+  std::int64_t first_source_ns_ = -1;
+  GstClockTime first_pts_ = 0;
   std::atomic<unsigned> frames_{0};
   std::atomic<unsigned> rejected_{0};
   bool finished_ = false;

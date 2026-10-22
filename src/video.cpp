@@ -15,11 +15,14 @@
 namespace raven::simulation {
 Video::Video(const std::string& host, const std::filesystem::path& directory,
              std::function<void(std::int64_t)> source_clock,
-             std::int64_t capture_clock_offset_ns)
+             std::int64_t capture_clock_offset_ns, const int width,
+             const int height)
     : frame_log_(directory / "frames.jsonl"),
       encoded_log_(directory / "encoded.jsonl"),
       source_clock_(std::move(source_clock)),
-      capture_clock_offset_ns_(capture_clock_offset_ns) {
+      capture_clock_offset_ns_(capture_clock_offset_ns),
+      width_(width),
+      height_(height) {
   if (!frame_log_ || !encoded_log_) {
     throw std::runtime_error("Cannot create frame logs");
   }
@@ -27,29 +30,44 @@ Video::Video(const std::string& host, const std::filesystem::path& directory,
   GError* error = nullptr;
 #ifdef _WIN32
   constexpr auto kEncoder = "nvh264enc";
-  constexpr auto kEncodePipeline =
+  constexpr auto kConvert =
+      "cudaupload ! cudaconvertscale ! "
+      "video/x-raw(memory:CUDAMemory),format=NV12";
+  constexpr auto kScale =
+      "cudascale ! "
+      "video/x-raw(memory:CUDAMemory),format=NV12,width=640,height=360 ";
+  constexpr auto kEncode =
       "nvh264enc preset=p4 tune=ultra-low-latency rc-mode=cbr "
-      "bitrate=6000 gop-size=30 bframes=0 zerolatency=true ";
+      "gop-size=30 bframes=0 zerolatency=true ";
 #else
   constexpr auto kEncoder = "x264enc";
-  constexpr auto kEncodePipeline =
+  constexpr auto kConvert = "videoconvert ! video/x-raw,format=NV12";
+  constexpr auto kScale =
+      "videoscale ! video/x-raw,format=NV12,width=640,height=360 ";
+  constexpr auto kEncode =
       "x264enc tune=zerolatency speed-preset=ultrafast "
-      "bitrate=6000 key-int-max=30 threads=2 ";
+      "key-int-max=30 threads=2 ";
 #endif
-  // Windows requires NVENC; hardware initialization errors must not silently
-  // switch a simulation performance run to software encoding.
+  // Archive the rendered HD image. Perception receives the same acquisition
+  // downscaled to its calibrated 640x360 grid; CUDA handles conversion/resize.
   const std::string pipeline =
-      "appsrc name=frames is-live=true format=time block=false "
-      "max-bytes=1382400 leaky-type=downstream "
-      "caps=video/x-raw,format=BGR,width=640,height=360,framerate=30/1 "
-      "! queue max-size-buffers=2 leaky=downstream ! videoconvert "
-      "! video/x-raw,format=NV12 ! " +
-      std::string(kEncodePipeline) +
-      "! h264parse ! tee name=encoded "
-      "encoded. ! queue ! rtph264pay name=rtp pt=96 config-interval=1 "
-      "! udpsink name=network port=5602 sync=false async=false "
-      "encoded. ! queue ! mp4mux faststart=true "
-      "! filesink name=record sync=false async=false";
+      "appsrc name=frames is-live=true format=time block=false max-bytes=" +
+      std::to_string(static_cast<std::size_t>(width) * height * 3U * 2U) +
+      " leaky-type=downstream caps=video/x-raw,format=BGR,width=" +
+      std::to_string(width) + ",height=" + std::to_string(height) +
+      ",framerate=30/1 ! queue max-size-buffers=2 leaky=downstream ! " +
+      kConvert + ",width=" + std::to_string(width) +
+      ",height=" + std::to_string(height) +
+      " ! tee name=raw "
+      "raw. ! queue max-size-buffers=2 leaky=downstream ! " +
+      kEncode +
+      "bitrate=12000 ! h264parse name=archive ! mp4mux faststart=true "
+      "! filesink name=record sync=false async=false "
+      "raw. ! queue max-size-buffers=2 leaky=downstream ! " +
+      kScale + " ! " + kEncode +
+      "bitrate=6000 ! h264parse ! "
+      "rtph264pay name=rtp pt=96 config-interval=1 "
+      "! udpsink name=network port=5602 sync=false async=false";
   pipeline_ = gst_parse_launch(pipeline.c_str(), &error);
   if (error != nullptr || pipeline_ == nullptr) {
     const std::string message =
@@ -66,7 +84,13 @@ Video::Video(const std::string& host, const std::filesystem::path& directory,
   std::ofstream encoder_log(directory / "encoder.json");
   if (!encoder_log ||
       !(encoder_log << nlohmann::json{{"factory", kEncoder},
-                                      {"gstreamer", gst_version_string()}}
+                                      {"gstreamer", gst_version_string()},
+                                      {"render_width", width},
+                                      {"render_height", height},
+                                      {"stream_width", 640},
+                                      {"stream_height", 360},
+                                      {"archive_bitrate_kbps", 12000},
+                                      {"stream_bitrate_kbps", 6000}}
                            .dump(2)
                     << '\n')) {
     gst_object_unref(pipeline_);
@@ -76,7 +100,9 @@ Video::Video(const std::string& host, const std::filesystem::path& directory,
   auto* network = gst_bin_get_by_name(GST_BIN(pipeline_), "network");
   auto* record = gst_bin_get_by_name(GST_BIN(pipeline_), "record");
   auto* payloader = gst_bin_get_by_name(GST_BIN(pipeline_), "rtp");
-  auto* encoded_pad = gst_element_get_static_pad(payloader, "sink");
+  auto* archive = gst_bin_get_by_name(GST_BIN(pipeline_), "archive");
+  auto* encoded_pad = gst_element_get_static_pad(archive, "src");
+  gst_object_unref(archive);
   gst_pad_add_probe(encoded_pad, GST_PAD_PROBE_TYPE_BUFFER, Encoded, this,
                     nullptr);
   gst_object_unref(encoded_pad);
@@ -128,8 +154,10 @@ void Video::Receive(const std::string& bytes) noexcept {
     microsoft::projectairsim::ImageMessage image;
     image.Deserialize(bytes);
     auto& pixels = image.GetPixelVector();
-    if (image.GetWidth() != 640 || image.GetHeight() != 360 ||
-        image.GetEncoding() != "BGR" || pixels.size() != 640U * 360U * 3U) {
+    if (image.GetWidth() != static_cast<unsigned>(width_) ||
+        image.GetHeight() != static_cast<unsigned>(height_) ||
+        image.GetEncoding() != "BGR" ||
+        pixels.size() != static_cast<std::size_t>(width_) * height_ * 3U) {
       ++rejected_;
       return;
     }
@@ -142,8 +170,13 @@ void Video::Receive(const std::string& bytes) noexcept {
       ++rejected_;
       return;
     }
-    const auto pts =
-        gst_clock_get_time(clock) - gst_element_get_base_time(pipeline_);
+    if (first_source_ns_ < 0) {
+      first_source_ns_ = image.GetTimestamp();
+      first_pts_ =
+          gst_clock_get_time(clock) - gst_element_get_base_time(pipeline_);
+    }
+    const auto pts = first_pts_ + static_cast<GstClockTime>(
+                                      image.GetTimestamp() - first_source_ns_);
     gst_object_unref(clock);
     std::unique_ptr<GstBuffer, decltype(&gst_buffer_unref)> buffer(
         gst_buffer_new_allocate(nullptr, pixels.size(), nullptr),

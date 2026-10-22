@@ -70,7 +70,7 @@ try {
     # The MSIX DirectX package supplies the legacy XInput DLL without modifying system directories.
     $runtime = Get-AppxPackage 'Microsoft.DirectXRuntime' | Select-Object -First 1
     if ($runtime) { $env:PATH = $runtime.InstallLocation + ';' + $previousPath }
-    $arguments = @('-ResX=960', '-ResY=540', '-nosound', '-unattended', '-dx11', "-graphicsadapter=$GraphicsAdapter")
+    $arguments = @('-ResX=640', '-ResY=360', '-nosound', '-unattended', '-dx11', "-graphicsadapter=$GraphicsAdapter")
     # Keep sensor resolution independent of scene detail. Temporal AA suppresses
     # moving foliage shimmer; disable photographic blur for perception inputs.
     $renderSettings = [ordered]@{
@@ -91,10 +91,34 @@ try {
         'r.DepthOfFieldQuality' = 0
         'r.SceneColorFringeQuality' = 0
     }
-    $overrides = foreach ($entry in $renderSettings.GetEnumerator()) {
-        '[SystemSettings]:{0}={1}' -f $entry.Key, $entry.Value
+    # Shipping builds may ignore command-line INI overrides. Persist only this
+    # project's rendering section in Unreal's normal per-user configuration.
+    $configDirectory = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'AirSimNH/Saved/Config/Windows'
+    New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
+    $graphicsConfig = Join-Path $configDirectory 'Engine.ini'
+    $content = ''
+    if (Test-Path -LiteralPath $graphicsConfig) {
+        $content = [IO.File]::ReadAllText($graphicsConfig)
+        $backup = $graphicsConfig + '.before-raven'
+        if (-not (Test-Path -LiteralPath $backup)) {
+            Copy-Item -LiteralPath $graphicsConfig -Destination $backup
+        }
     }
-    $arguments += '-ini:Engine:' + ($overrides -join ',')
+    $section = [regex]::Match($content, '(?ms)^\[SystemSettings\]\r?\n(.*?)(?=^\[|\z)')
+    $body = if ($section.Success) { $section.Groups[1].Value } else { '' }
+    foreach ($entry in $renderSettings.GetEnumerator()) {
+        $keyPattern = '(?m)^' + [regex]::Escape($entry.Key) + '=.*$'
+        $line = '{0}={1}' -f $entry.Key, $entry.Value
+        if ([regex]::IsMatch($body, $keyPattern)) {
+            $body = [regex]::Replace($body, $keyPattern, $line)
+        } else { $body = $body.TrimEnd() + "`n" + $line + "`n" }
+    }
+    $replacement = "[SystemSettings]`n" + $body.Trim() + "`n`n"
+    if ($section.Success) {
+        $content = $content.Substring(0, $section.Index) + $replacement +
+            $content.Substring($section.Index + $section.Length)
+    } else { $content = $content.TrimEnd() + "`n`n" + $replacement }
+    [IO.File]::WriteAllText($graphicsConfig, $content)
     $windowStyle = 'Hidden'
     if ($Visible) { $windowStyle = 'Normal' } else { $arguments += '-RenderOffScreen' }
     $process = Start-Process -FilePath $executable -ArgumentList $arguments -WorkingDirectory $base -WindowStyle $windowStyle -PassThru
@@ -104,6 +128,6 @@ try {
         Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
         throw
     }
-    @{process_id = $process.Id; executable = $executable; arguments = $arguments} | ConvertTo-Json | Set-Content -LiteralPath $stateFile
+    @{process_id = $process.Id; executable = $executable; arguments = $arguments; graphics_config = $graphicsConfig; render_settings = $renderSettings} | ConvertTo-Json | Set-Content -LiteralPath $stateFile
     Write-Output "Simulator process: $($process.Id)"
 } finally { $env:PATH = $previousPath }

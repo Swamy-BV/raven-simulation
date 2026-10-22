@@ -2,6 +2,7 @@
 #include "client.h"
 
 #include <ProjectAirSimMessage/response_message.hpp>
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <fstream>
@@ -51,7 +52,6 @@ void Client::Load(const std::filesystem::path& directory) {
         "Scene loading");
   prefix_ = world_->GetParentTopic();
   actors_.clear();
-  pending_traffic_routes_.clear();
   for (const auto& object : bindings_.value("scenery", Json::array())) {
     Request("ListAssets",
             {{"name", "^" + object.at("asset").get<std::string>() + "$"}});
@@ -76,114 +76,86 @@ void Client::Load(const std::filesystem::path& directory) {
       throw std::runtime_error("Course scenery could not be spawned");
     }
   }
-  const auto scene_start_seconds =
-      static_cast<double>(
-          Request("GetSimTime", Json::object()).get<std::int64_t>()) /
-      1000000000.0;
+  const auto start_ns =
+      Request("GetSimTime", Json::object()).get<std::int64_t>();
+  const auto add = [&](const Json& target, const std::filesystem::path& route,
+                       const bool waiting) {
+    DisplayActor actor{target, {}, {}, std::nullopt, start_ns, waiting};
+    if (bindings_.value("real_time", false)) {
+      std::ifstream file(route);
+      if (!file) {
+        throw std::runtime_error("Cannot read fixture trajectory");
+      }
+      Json trajectory;
+      file >> trajectory;
+      std::vector<MotionPoint> points;
+      for (std::size_t i = 0; i < trajectory.at("time_sec").size(); ++i) {
+        points.push_back({trajectory.at("time_sec").at(i).get<double>(),
+                          {trajectory.at("pose_x").at(i).get<double>(),
+                           trajectory.at("pose_y").at(i).get<double>(),
+                           trajectory.at("pose_z").at(i).get<double>()},
+                          trajectory.at("pose_yaw").at(i).get<double>()});
+      }
+      actor.motion.emplace(std::move(points));
+    }
+    actor.display = Spawn(actor);
+    actors_.push_back(std::move(actor));
+  };
   const auto& target = bindings_.at("target");
   if (!target.is_null()) {
-    if (bindings_.value("real_time", false)) {
-      const auto wait = bindings_.value("target_start_on_ready", false);
-      pending_target_route_ =
-          wait ? directory / "trajectory.json" : std::filesystem::path{};
-      StartRoute(directory / "trajectory.json", target.at("name"),
-                 scene_start_seconds, wait);
-    }
-    actors_.push_back({target, Spawn(target), {}});
+    add(target, directory / "trajectory.json",
+        bindings_.value("target_start_on_ready", false));
   }
   std::size_t traffic_index = 1;
   for (const auto& actor : bindings_.value("traffic", Json::array())) {
-    if (bindings_.value("real_time", false)) {
-      const auto route =
-          directory /
-          ("traffic-" + std::to_string(traffic_index) + "-trajectory.json");
-      const auto wait = bindings_.value("traffic_start_on_ready", false);
-      StartRoute(route, actor.at("name"), scene_start_seconds, wait);
-      if (wait) {
-        pending_traffic_routes_.emplace_back(
-            route, actor.at("name").get<std::string>());
-      }
-    }
-    ++traffic_index;
-    actors_.push_back({actor, Spawn(actor), {}});
-  }
-}
-
-void Client::StartRoute(const std::filesystem::path& trajectory,
-                        const std::string& actor, double scene_start_seconds,
-                        const bool stationary) {
-  std::ifstream file(trajectory);
-  if (!file) {
-    throw std::runtime_error("Cannot read actor trajectory");
-  }
-  Json route;
-  file >> route;
-  if (stationary) {
-    // A separate constant trajectory holds the fixture during flight setup.
-    // Its moving route is anchored only after the operator/test signals ready.
-    for (auto& field : route.items()) {
-      if (field.value().is_array()) {
-        const auto value = field.key().find("velocity_") == 0
-                               ? Json(0.0)
-                               : field.value().front();
-        field.value() = Json::array({value, value});
-      }
-    }
-    route["time_sec"] = {-1.0, 3600.0};
-  }
-  // TimeSec is float upstream: subtracting host uptime can round the first
-  // update to exactly zero. Keep it inside an interval; a zero first knot
-  // otherwise makes the upstream interpolator access index -1.
-  route["time_sec"][0] = -1.0;
-  const auto name = actor + (stationary ? "_hold" : "_route");
-  if (!Request("ImportNEDTrajectory",
-               {{"traj_name", name},
-                {"time", route.at("time_sec")},
-                {"pose_x", route.at("pose_x")},
-                {"pose_y", route.at("pose_y")},
-                {"pose_z", route.at("pose_z")},
-                {"pose_roll", route.at("pose_roll")},
-                {"pose_pitch", route.at("pose_pitch")},
-                {"pose_yaw", route.at("pose_yaw")},
-                {"vel_x_lin", route.at("velocity_linear_x")},
-                {"vel_y_lin", route.at("velocity_linear_y")},
-                {"vel_z_lin", route.at("velocity_linear_z")}})
-           .get<bool>()) {
-    throw std::runtime_error("Cannot import actor route");
-  }
-  // Real-time simulation uses host uptime, not zero-based scenario time.
-  // Offset only environment actors; PX4 retains sole aircraft control.
-  if (!Request("SetEnvActorTrajectory", {{"env_actor_name", actor},
-                                         {"traj_name", name},
-                                         {"time_offset", scene_start_seconds},
-                                         {"x_offset", 0},
-                                         {"y_offset", 0},
-                                         {"z_offset", 0},
-                                         {"roll_offset", 0},
-                                         {"pitch_offset", 0},
-                                         {"yaw_offset", 0},
-                                         {"to_loop", true}})
-           .get<bool>()) {
-    throw std::runtime_error("Cannot anchor actor route to scene start");
+    add(actor,
+        directory /
+            ("traffic-" + std::to_string(traffic_index++) + "-trajectory.json"),
+        bindings_.value("traffic_start_on_ready", false));
   }
 }
 
 void Client::StartTarget() {
-  if (pending_target_route_.empty()) {
-    throw std::runtime_error("Target is not waiting for a start signal");
-  }
   const auto stamp = Request("GetSimTime", Json::object()).get<std::int64_t>();
-  StartRoute(pending_target_route_, bindings_.at("target").at("name"),
-             static_cast<double>(stamp) / 1000000000.0);
-  pending_target_route_.clear();
-  for (const auto& route : pending_traffic_routes_) {
-    StartRoute(route.first, route.second,
-               static_cast<double>(stamp) / 1000000000.0);
+  bool started = false;
+  for (auto& actor : actors_) {
+    if (actor.waiting && actor.motion) {
+      actor.motion_start_ns = stamp;
+      actor.waiting = false;
+      started = true;
+    }
   }
-  pending_traffic_routes_.clear();
+  if (!started) {
+    throw std::runtime_error("No fixture is waiting to start");
+  }
 }
 
-std::string Client::Spawn(const Json& target) {
+Json Client::FixturePose(const DisplayActor& actor,
+                         const std::int64_t time_ns) {
+  if (!actor.motion) {
+    return Request("GetObjectPose", {{"object_name", actor.target.at("name")}});
+  }
+  // Subtract integer timestamps before converting to seconds: float uptime
+  // loses 62.5 ms at eight days. Never feed this fixture state to guidance.
+  const auto elapsed =
+      actor.waiting
+          ? 0.0
+          : static_cast<double>(time_ns - actor.motion_start_ns) / 1000000000.0;
+  const auto point = actor.motion->At(std::max(0.0, elapsed));
+  return {{"frame_id", "DEFAULT_ID"},
+          {"translation",
+           {{"x", point.position[0]},
+            {"y", point.position[1]},
+            {"z", point.position[2]}}},
+          {"rotation",
+           {{"w", std::cos(point.yaw / 2)},
+            {"x", 0},
+            {"y", 0},
+            {"z", std::sin(point.yaw / 2)}}}};
+}
+
+std::string Client::Spawn(const DisplayActor& actor) {
+  const auto& target = actor.target;
   // ListAssets also populates the simulator's asset cache before spawning.
   std::string asset_filter = "^";
   for (const char character : target.at("asset").get<std::string>()) {
@@ -197,8 +169,7 @@ std::string Client::Spawn(const Json& target) {
   if (!assets.is_array() || assets.empty()) {
     throw std::runtime_error("Scene assets are unavailable");
   }
-  const auto pose =
-      Request("GetObjectPose", {{"object_name", target.at("name")}});
+  const auto pose = FixturePose(actor, actor.motion_start_ns);
   const auto display =
       Request("SpawnObject", {{"object_name", target.at("display_name")},
                               {"asset_path", target.at("asset")},
@@ -209,7 +180,8 @@ std::string Client::Spawn(const Json& target) {
   if (display.empty()) {
     throw std::runtime_error("No display target was spawned");
   }
-  if (!Request("SetObjectScale",
+  if (!actor.motion &&
+      !Request("SetObjectScale",
                {{"object_name", target.at("name")}, {"scale", {0, 0, 0}}})
            .get<bool>()) {
     throw std::runtime_error("Could not hide trajectory fixture");
@@ -242,7 +214,7 @@ Json Client::Sample() {
        Request("GetObjectPose", {{"object_name", bindings_.at("aircraft")}})}};
   for (std::size_t i = 0; i < actors_.size(); ++i) {
     auto& actor = actors_[i];
-    const auto pose = UpdateDisplay(actor);
+    const auto pose = UpdateDisplay(actor, time);
     if (i == 0) {
       sample["target"] = pose;
     } else {
@@ -250,14 +222,16 @@ Json Client::Sample() {
           {{"name", actor.target.at("name")}, {"pose", pose}});
     }
   }
+  sample["fixture_pose_source"] = bindings_.value("real_time", false)
+                                      ? "elapsed-time display command"
+                                      : "simulator environment actor";
   return sample;
 }
 
-Json Client::UpdateDisplay(DisplayActor& actor) {
+Json Client::UpdateDisplay(DisplayActor& actor, const std::int64_t time_ns) {
   const auto& target = actor.target;
   const auto& display = actor.display;
-  const auto pose =
-      Request("GetObjectPose", {{"object_name", target.at("name")}});
+  const auto pose = FixturePose(actor, time_ns);
   for (const auto* axis : {"x", "y", "z"}) {
     if (!std::isfinite(pose.at("translation").at(axis).get<double>())) {
       throw std::runtime_error("Non-finite target fixture pose");

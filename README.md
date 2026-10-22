@@ -24,6 +24,8 @@ flowchart LR
 
 Scenario profiles own the scene ID, aircraft spawn, target asset, visual alignment and route parameters. The shared client consumes generated bindings instead of assuming a particular car or scene name. Video, clock and PX4 lifecycle code stay shared. Each profile is discovered by CTest for offline validation; flight tests remain explicit and scenario-specific. The current `follow` test targets the street-loop car profile.
 
+The `hitl-neighborhood` profile uses the packaged neighborhood streets, renders and records 1280×720, and sends a CUDA-downscaled 640×360 stream to the board. Real-time car fixtures use double-precision elapsed time in the host bridge, avoiding the packaged simulator's float-uptime trajectory quantization. PX4 continues to control the aircraft; fixture poses are never follower inputs.
+
 To add a scenario, add a profile under `scenarios/` and select it in the bridge command. Rounded-rectangle routes are currently supported; new route types need a generator in `src/scenario.cpp`. New environments also require their assets to be installed in AirSim. This does not imply arbitrary actors or environments already work.
 
 This uses **IAMAI ProjectAirSim v1.0.1**, the continuation linked by Microsoft's original AirSim project. Source and environment pins are in `versions.env`. The PX4 checkout must match Raven's `px4_msgs`; do not substitute an older PX4 release to match an example.

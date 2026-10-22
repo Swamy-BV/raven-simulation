@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "rtp_time.h"
 
-#include <stdexcept>
-
 #include <gst/rtp/gstrtphdrext.h>
+
+#include <stdexcept>
 
 namespace {
 constexpr guint64 kNtpUnixOffset = 2208988800ULL * GST_SECOND;

@@ -157,6 +157,7 @@ def main():
         "! h264parse ! mp4mux faststart=true ! filesink name=output")
     encoder.get_by_name("output").set_property("location", str(args.output))
     first_pts = None
+    output_size = (640, 360)
     counts = {"frames": 0, "with_tracks": 0, "unmatched_frames": 0}
 
     def text(context, x, y, value, size=13):
@@ -174,6 +175,8 @@ def main():
         if abs(pts[index] - timestamp) > 2000000:
             counts["unmatched_frames"] += 1
             return
+        context.save()
+        context.scale(output_size[0] / 640, output_size[1] / 360)
         stamp = encoded_frames[index][clock_key]
         track = tracks.previous(stamp, 200000000)
         state = health.previous(stamp, 1500000000)
@@ -218,6 +221,8 @@ def main():
         else:
             text(context, 10, 348, "No recent ROS track for this source frame")
 
+        context.restore()
+
     encoder.get_by_name("overlay").connect("draw", draw)
     try:
         decoder.set_state(Gst.State.PAUSED)
@@ -241,6 +246,8 @@ def main():
                 break
             if first_pts is None:
                 first_pts = sample.get_buffer().pts
+                caps = sample.get_caps().get_structure(0)
+                output_size = (caps.get_value("width"), caps.get_value("height"))
                 app.set_property("caps", sample.get_caps())
                 encoder.set_state(Gst.State.PLAYING)
             buffer = sample.get_buffer().copy_deep()
@@ -261,6 +268,7 @@ def main():
     if counts["unmatched_frames"] or not counts["with_tracks"]:
         raise RuntimeError(f"Review source alignment failed: {counts}")
     report = dict(counts, controller=controller_label, clock=clock_key,
+                  width=output_size[0], height=output_size[1],
                   start_seconds=begin / 1e9, end_seconds=end / 1e9,
                   decoder="nvh264dec", encoder="nvh264enc",
                   overlay="Recorded ROS boxes held at most 200 ms; age shown",

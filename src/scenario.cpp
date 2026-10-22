@@ -339,6 +339,15 @@ std::string ActorFile(const std::size_t index) {
                     : "traffic-" + std::to_string(index) + ".jsonc";
 }
 
+int RenderWidth(const Json& profile) {
+  const auto width =
+      profile.value("camera", Json::object()).value("render_width", 640);
+  if (width != 640 && width != 1280 && width != 1920) {
+    throw std::runtime_error("Camera render width must be 640, 1280 or 1920");
+  }
+  return width;
+}
+
 Json Camera(const Json& profile) {
   const auto camera = profile.value("camera", Json::object());
   const auto pitch = camera.value("pitch_down_deg", 35.0);
@@ -361,8 +370,8 @@ Json Camera(const Json& profile) {
             {"rpy-deg", "0 " + std::to_string(-pitch) + " 0"}}},
           {"capture-settings",
            {{{"image-type", 0},
-             {"width", 640},
-             {"height", 360},
+             {"width", RenderWidth(profile)},
+             {"height", RenderWidth(profile) * 9 / 16},
              {"fov-degrees", fov},
              {"capture-enabled", true},
              {"streaming-enabled", true},
@@ -473,11 +482,13 @@ void ValidateScenario(const std::filesystem::path& profile,
   Json traffic = Json::array();
   for (std::size_t i = 0; i < profiles.size(); ++i) {
     const auto& actor = profiles[i].at("target");
-    scene["environment-actors"].push_back(
-        {{"type", "env_actor"},
-         {"name", actor.at("name")},
-         {"origin", {{"xyz", "0 0 0"}, {"rpy-deg", "0 0 0"}}},
-         {"env-actor-config", ActorFile(i)}});
+    if (!IsHitl(settings)) {
+      scene["environment-actors"].push_back(
+          {{"type", "env_actor"},
+           {"name", actor.at("name")},
+           {"origin", {{"xyz", "0 0 0"}, {"rpy-deg", "0 0 0"}}},
+           {"env-actor-config", ActorFile(i)}});
+    }
     if (i > 0) {
       traffic.push_back(actor);
     }
@@ -522,31 +533,34 @@ ScenarioRuntime GenerateScenario(const std::filesystem::path& profile,
   const bool hitl = IsHitl(Read(profile));
   const ScenarioRuntime runtime{
       hitl ? FlightController::kHitl : FlightController::kSitl,
-      Read(profile).value("stream_video_to_board", true)};
+      Read(profile).value("stream_video_to_board", true),
+      RenderWidth(Read(profile)), RenderWidth(Read(profile)) * 9 / 16};
   auto robot = Read(robot_template);
-  auto& settings = robot["controller"]["px4-settings"];
-  settings["local-host-ip"] = hitl ? "0.0.0.0" : host;
-  settings["lock-step"] = !hitl;
-  const bool serial_hitl = !serial_port.empty();
-  if (serial_hitl && !hitl) {
-    throw std::runtime_error(
-        "A physical serial controller requires a HITL scenario");
+  if (robot.value("physics-type", std::string{}) != "non-physics") {
+    auto& settings = robot["controller"]["px4-settings"];
+    settings["local-host-ip"] = hitl ? "0.0.0.0" : host;
+    settings["lock-step"] = !hitl;
+    const bool serial_hitl = !serial_port.empty();
+    if (serial_hitl && !hitl) {
+      throw std::runtime_error(
+          "A physical serial controller requires a HITL scenario");
+    }
+    settings["use-serial"] = serial_hitl;
+    settings["use-tcp"] = !serial_hitl;
+    if (serial_hitl) {
+      settings["serial-port"] = serial_port;
+      settings["serial-baud-rate"] = 921600;
+    }
+    settings["tcp-port"] = 4560;
+    settings["control-ip-address"] = hitl ? board : "remote";
+    if (hitl) {
+      settings["hil-gps-update-rate-hz"] = 10.0;
+    }
+    settings["control-port"] = 14581;
+    settings["control-port-remote"] = 14581;
+    settings["control-port-local"] = 14580;
+    settings["parameters"] = Json::object();
   }
-  settings["use-serial"] = serial_hitl;
-  settings["use-tcp"] = !serial_hitl;
-  if (serial_hitl) {
-    settings["serial-port"] = serial_port;
-    settings["serial-baud-rate"] = 921600;
-  }
-  settings["tcp-port"] = 4560;
-  settings["control-ip-address"] = hitl ? board : "remote";
-  if (hitl) {
-    settings["hil-gps-update-rate-hz"] = 10.0;
-  }
-  settings["control-port"] = 14581;
-  settings["control-port-remote"] = 14581;
-  settings["control-port-local"] = 14580;
-  settings["parameters"] = Json::object();
   Json sensors = Json::array({Camera(Read(profile))});
   for (const auto& sensor : robot.at("sensors")) {
     if (sensor.at("type") != "camera") {
@@ -556,7 +570,7 @@ ScenarioRuntime GenerateScenario(const std::filesystem::path& profile,
   robot["sensors"] = sensors;
   Write(directory / "camera.jsonc", robot);
   const auto profiles = ActorProfiles(Read(profile));
-  if (profiles.empty()) {
+  if (profiles.empty() || hitl) {
     return runtime;
   }
   auto rover =

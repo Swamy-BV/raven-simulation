@@ -1,0 +1,67 @@
+{
+  "passed": true,
+  "scenario": "hitl-neighborhood",
+  "controller": "physical i.MX95 M7 PX4 HITL",
+  "command_path": "ROS 2 DDS over RPMsg",
+  "cars": 3,
+  "environment": "packaged Neighborhood native streets; no raised test platform",
+  "model": "yolov8s-neutron",
+  "graphics_configuration": "Unreal per-user Engine.ini SystemSettings; Epic detail and temporal anti-aliasing",
+  "camera_render_and_archive": [
+    1280,
+    720
+  ],
+  "perception_stream": [
+    640,
+    360
+  ],
+  "scaling": "CUDA conversion and downscaling; NVENC p4 H.264",
+  "archive_bitrate_kbps": 12000,
+  "network_bitrate_kbps": 6000,
+  "review_bitrate_kbps": 8000,
+  "trajectory_time": "integer nanoseconds subtracted before double elapsed seconds; host evaluates display-only fixtures",
+  "underlying_server_float_clock_changed": false,
+  "before_motion_steps_m": 1.1176,
+  "after_cruise_display_step_median_m": 0.2857274861363641,
+  "after_cruise_display_step_p95_m": 0.2861377868799373,
+  "display_update_interval_median_ms": 15.3443,
+  "video_fps": 26.952960012701716,
+  "fixture_reference_peak_mph": 40.00000000084812,
+  "fixture_speed_note": "Reference display commands; cars slow for native street corners. Not independent measured vehicle speed.",
+  "source_age_median_ms": 169.296858,
+  "source_age_max_ms": 236.274268,
+  "moving_follow_seconds": 61,
+  "selected_id_retained": true,
+  "following_fraction": 1.0,
+  "normal_arming": true,
+  "identity_loss_hold_braking": true,
+  "landed": true,
+  "disarmed": true,
+  "board_services_and_parameters_restored": true,
+  "recording_seconds": 79.969142857,
+  "recording_verified": [
+    1280,
+    720
+  ],
+  "playback": "source capture cadence; no artificial speed-up",
+  "checks": {
+    "windows_msvc_warnings_as_errors": true,
+    "scenario_ctest": 11,
+    "clang_format": true,
+    "cmake_format_lint": true,
+    "powershell_syntax": true,
+    "motion_precision_samples": 19999,
+    "motion_precision_max_error_m": 4.54747e-13
+  },
+  "startup_attempts": [
+    "ROS double parameter supplied as integer; fixed scenario value",
+    "Tracker restart rate limit during repeated setup; reset failed state and reused existing setup"
+  ],
+  "limits": [
+    "One successful M7 run; repeatability not established",
+    "Camera remains about 27 fps, not 60 fps",
+    "Car display still uses host RPC updates, not an Unreal-native motion component",
+    "Packaged scene and car assets unchanged; not a newly authored photorealistic environment",
+    "No obstacle avoidance; explicit unmapped-motion HITL bench"
+  ]
+}

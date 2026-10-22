@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
             clock->Send(stamp);
           }
         },
-        capture_clock_offset_ns);
+        capture_clock_offset_ns, runtime.render_width, runtime.render_height);
     Client client(argv[1]);
     client.Load(directory / "config");
     client.Subscribe([&video](const std::string&, const std::string& bytes) {
@@ -160,7 +160,8 @@ int main(int argc, char** argv) {
                   << " rejected=" << video.Rejected() << std::endl;
         report = now;
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      std::this_thread::sleep_for(std::chrono::milliseconds(
+          runtime.controller == FlightController::kHitl ? 2 : 20));
     }
     client.Unsubscribe();
     video.Finish();

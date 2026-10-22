@@ -5,9 +5,12 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "motion.h"
 
 namespace raven::simulation {
 namespace sdk = microsoft::projectairsim::client;
@@ -32,21 +35,19 @@ class Client {
     Json target;
     std::string display;
     Json previous_pose;
+    std::optional<Motion> motion;
+    std::int64_t motion_start_ns = 0;
+    bool waiting = false;
   };
 
   Json Request(const std::string& method, const Json& parameters);
-  std::string Spawn(const Json& target);
-  void StartRoute(const std::filesystem::path& trajectory,
-                  const std::string& actor, double scene_start_seconds,
-                  bool stationary = false);
-  Json UpdateDisplay(DisplayActor& actor);
+  std::string Spawn(const DisplayActor& actor);
+  Json UpdateDisplay(DisplayActor& actor, std::int64_t time_ns);
+  Json FixturePose(const DisplayActor& actor, std::int64_t time_ns);
   std::shared_ptr<sdk::Client> client_;
   std::shared_ptr<sdk::World> world_;
   std::string prefix_;
   Json bindings_;
-  std::filesystem::path pending_target_route_;
-  std::vector<std::pair<std::filesystem::path, std::string>>
-      pending_traffic_routes_;
 
   std::vector<DisplayActor> actors_;
   std::int64_t previous_time_ = 0;
