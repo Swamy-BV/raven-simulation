@@ -120,8 +120,9 @@ std::vector<Json> ActorProfiles(const Json& settings) {
   }
   std::vector<Json> profiles{settings};
   const auto traffic = settings.value("traffic", Json::array());
-  if (!traffic.is_array() || traffic.size() > 15) {
-    throw std::runtime_error("Traffic must contain at most fifteen vehicles");
+  if (!traffic.is_array() || traffic.size() > 24) {
+    throw std::runtime_error(
+        "Traffic must contain at most twenty-four vehicles");
   }
   for (const auto& actor : traffic) {
     auto profile = settings;
@@ -336,6 +337,36 @@ Json Course(const Json& profile) {
   return objects;
 }
 
+Json Scenery(const Json& profile) {
+  auto objects = Course(profile);
+  const auto extras = profile.value("scenery", Json::array());
+  if (!extras.is_array() || extras.size() > 64) {
+    throw std::runtime_error("Extra scenery must contain at most 64 objects");
+  }
+  std::set<std::string> names;
+  for (const auto& object : objects) {
+    names.insert(object.at("name").get<std::string>());
+  }
+  for (const auto& object : extras) {
+    const auto name = object.at("name").get<std::string>();
+    const auto position = object.at("position").get<std::array<double, 3>>();
+    const auto scale = object.at("scale").get<std::array<double, 3>>();
+    if (name.empty() || !names.insert(name).second ||
+        object.at("asset").get<std::string>().empty() ||
+        !std::isfinite(object.at("yaw").get<double>())) {
+      throw std::runtime_error("Invalid extra scenery identity or heading");
+    }
+    for (std::size_t axis = 0; axis < position.size(); ++axis) {
+      if (!std::isfinite(position[axis]) || std::abs(position[axis]) > 10000 ||
+          !std::isfinite(scale[axis]) || scale[axis] <= 0 || scale[axis] > 10) {
+        throw std::runtime_error("Invalid extra scenery position or scale");
+      }
+    }
+    objects.push_back(object);
+  }
+  return objects;
+}
+
 bool IsHitl(const Json& profile) {
   const auto mode = profile.value("flight_controller", std::string("sitl"));
   if (mode != "sitl" && mode != "hitl") {
@@ -380,6 +411,15 @@ int RenderWidth(const Json& profile) {
   return width;
 }
 
+int CaptureRate(const Json& profile) {
+  const int rate =
+      profile.value("camera", Json::object()).value("capture_rate_hz", 30);
+  if (rate < 1 || rate > 60) {
+    throw std::runtime_error("Camera capture rate must be 1 to 60 Hz");
+  }
+  return rate;
+}
+
 Json Camera(const Json& profile) {
   const auto camera = profile.value("camera", Json::object());
   const auto pitch = camera.value("pitch_down_deg", 35.0);
@@ -392,7 +432,7 @@ Json Camera(const Json& profile) {
           {"type", "camera"},
           {"enabled", true},
           {"parent-link", "Frame"},
-          {"capture-interval", 1.0 / 30},
+          {"capture-interval", 1.0 / CaptureRate(profile)},
           {"gimbal",
            {{"lock-roll", camera.value("stabilized", false)},
             {"lock-pitch", camera.value("stabilized", false)},
@@ -563,7 +603,7 @@ void ValidateScenario(const std::filesystem::path& profile,
          {"traffic_start_on_ready",
           settings.value("traffic_start_on_ready", false)},
          {"acceptance", settings.value("acceptance", Json::object())},
-         {"scenery", Course(settings)}});
+         {"scenery", Scenery(settings)}});
 }
 
 ScenarioRuntime GenerateScenario(const std::filesystem::path& profile,
@@ -585,7 +625,8 @@ ScenarioRuntime GenerateScenario(const std::filesystem::path& profile,
   const ScenarioRuntime runtime{
       hitl ? FlightController::kHitl : FlightController::kSitl,
       Read(profile).value("stream_video_to_board", true),
-      RenderWidth(Read(profile)), RenderWidth(Read(profile)) * 9 / 16};
+      RenderWidth(profile_settings), RenderWidth(profile_settings) * 9 / 16,
+      CaptureRate(profile_settings)};
   auto robot = Read(robot_template);
   if (robot.value("physics-type", std::string{}) != "non-physics") {
     auto& settings = robot["controller"]["px4-settings"];

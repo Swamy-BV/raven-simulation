@@ -9,6 +9,10 @@
 #include <string>
 #include <thread>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "client.h"
 #include "clock.h"
 #include "scenario.h"
@@ -18,6 +22,43 @@ namespace {
 volatile std::sig_atomic_t gStop = 0;
 
 void Stop(int) { gStop = 1; }
+
+class LoopDelay {
+ public:
+#ifdef _WIN32
+  LoopDelay()
+      : timer_(CreateWaitableTimerExW(nullptr, nullptr,
+                                      CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+                                      TIMER_MODIFY_STATE | SYNCHRONIZE)) {
+    if (timer_ == nullptr) {
+      throw std::runtime_error("Cannot create high-resolution loop timer");
+    }
+  }
+  ~LoopDelay() { CloseHandle(timer_); }
+#else
+  LoopDelay() = default;
+#endif
+  LoopDelay(const LoopDelay&) = delete;
+  LoopDelay& operator=(const LoopDelay&) = delete;
+
+  void Wait(const int milliseconds) {
+#ifdef _WIN32
+    LARGE_INTEGER due{};
+    due.QuadPart = -static_cast<LONGLONG>(milliseconds) * 10000;
+    if (!SetWaitableTimer(timer_, &due, 0, nullptr, nullptr, false) ||
+        WaitForSingleObject(timer_, INFINITE) != WAIT_OBJECT_0) {
+      throw std::runtime_error("Bridge loop timer failed");
+    }
+#else
+    std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
+#endif
+  }
+
+ private:
+#ifdef _WIN32
+  HANDLE timer_;
+#endif
+};
 
 class OutputLog {
  public:
@@ -118,7 +159,8 @@ int main(int argc, char** argv) {
             clock->Send(stamp);
           }
         },
-        capture_clock_offset_ns, runtime.render_width, runtime.render_height);
+        capture_clock_offset_ns, runtime.render_width, runtime.render_height,
+        runtime.capture_rate_hz);
     Client client(argv[1]);
     client.Load(directory / "config");
     client.Subscribe([&video](const std::string&, const std::string& bytes) {
@@ -128,6 +170,7 @@ int main(int argc, char** argv) {
     if (!poses) {
       throw std::runtime_error("Cannot create pose log");
     }
+    LoopDelay loop_delay;
     const auto start = std::chrono::steady_clock::now();
     auto report = start;
     bool target_started = false;
@@ -160,8 +203,7 @@ int main(int argc, char** argv) {
                   << " rejected=" << video.Rejected() << std::endl;
         report = now;
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(
-          runtime.controller == FlightController::kHitl ? 2 : 20));
+      loop_delay.Wait(runtime.controller == FlightController::kHitl ? 2 : 20);
     }
     client.Unsubscribe();
     video.Finish();

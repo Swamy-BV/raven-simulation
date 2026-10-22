@@ -32,6 +32,8 @@ The `hitl-highway-traffic` profile uses a three-lane loop with thirteen cars, a 
 
 The `hitl-fleet-weave` profile combines three gradual lane changes, a slower fleet that queues before the first roundabout, two timed crossing cars, and two roundabouts. Fixture schedules use smooth distance-based lane changes and stop-and-hold trajectories; the aircraft still follows only board perception.
 
+The `hitl-urban-challenge` profile expands fleet weaving with staggered shoulder merges, extra crossing cars, two S-curve sequences, two roundabouts, a wide U-turn and stationary roadside spectators. Spectators use packaged skeletal meshes without walking animation. Fixture movement uses bounded concurrent requests on separate actor connections and a high-resolution Windows wait; it does not provide engine-side interpolation. Flight validation and video smoothness must be reported separately.
+
 To add a scenario, add a profile under `scenarios/` and select it in the bridge command. Rounded rectangles and closed segment routes (lines, arcs and tangent Bezier transitions) are supported. New environments also require their assets to be installed in AirSim. This does not imply arbitrary actors or environments already work.
 
 This uses **IAMAI ProjectAirSim v1.0.1**, the continuation linked by Microsoft's original AirSim project. Source and environment pins are in `versions.env`. The PX4 checkout must match Raven's `px4_msgs`; do not substitute an older PX4 release to match an example.
@@ -203,7 +205,7 @@ The physical M7 passed normal arming, takeoff, a 10-second hover, **61 seconds o
 
 `hitl-racetrack.jsonc` adds a clear 500 x 300 m circuit with 110 m bends and three cars. The selected car waits five seconds after readiness, then cruises at 40 mph; other cars use adjacent lanes. The physical M7 followed it through the first bend for about 17 seconds after reaching cruising speed, with a measured car average of 40.0 mph. The 61-second gate failed on selected-identity loss, followed by automatic landing and disarm. YOLOv8s runs on the board's NPU; the close chase uses 4.5 m takeoff height and 8 m nominal stand-off. Yaw/association stability and full-minute following remain unfinished. See `results/racetrack-hitl-validation.json`.
 
-For the deferred HITL car start, set `RAVEN_SIM_RUN_DIR` to the active bridge run directory when invoking `scripts/run-hitl-test.sh`. The harness creates the `start-target` marker after following is ready. Review recorded frames; AirSim's one-shot `GetImages` probe interrupts continuous capture.
+For the deferred HITL car start, set `RAVEN_SIM_RUN_DIR` to the active bridge run directory when invoking `scripts/run-hitl-test.sh`. The harness snapshots the disarmed HIL controller’s MPC parameters, applies the profile settings from generated `px4.env`, and restores the original values after the flight. It creates the `start-target` marker after following is ready. Review recorded frames; AirSim's one-shot `GetImages` probe interrupts continuous capture.
 
 ## Results and limits
 
@@ -211,7 +213,7 @@ The 40 mph traffic profile reached **40.00 mph measured from live simulator posi
 
 The historical low-speed `street-follow.jsonc` profile passed **25.008 simulated seconds / 40.20 wall seconds** of selected-car following, then identity-loss hold, landing and disarm. The target speed was 0.1 m/s. A separate interrupted-camera test latched hold and landed, and five-second-old ROS images produced no detections. These do not validate the faster default loop, multiple cars, viewpoint changes or physical flight. See `results/timing-validation.json`; older baseline results remain historical evidence.
 
-Capture/sender/ROS profiles request 30 fps; this is not a measured throughput guarantee. The latest Windows GPU/PX4 recording measured 26.77 fps in real time. Track simulation-time rate, real-time rate and review-video sampling separately.
+Camera capture defaults to 30 Hz; `hitl-urban-challenge` requests 60 Hz. These are requests, not throughput guarantees. Video preserves acquisition timestamps; measure capture delivery, simulation-time rate and review-video sampling separately.
 
 Each bridge run saves `camera.mp4`, `frames.jsonl` (capture/host timing and sender queue occupancy), `encoded.jsonl` (encoder output timing), `clock.jsonl` (simulation clock sends), `poses.jsonl` and generated `config/`. Pose logs are evaluation evidence, not follower inputs. The RTP sender carries the original capture time using NTP-64; the board explicitly enables this shared simulation-clock policy.
 

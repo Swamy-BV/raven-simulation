@@ -21,12 +21,16 @@ void Check(const sdk::Status status, const std::string& operation) {
 }
 
 Client::Client(const std::string& host)
-    : client_(std::make_shared<sdk::Client>()),
+    : host_(host),
+      client_(std::make_shared<sdk::Client>()),
       world_(std::make_shared<sdk::World>()) {
   Check(client_->Connect(host), "AirSim connection");
 }
 
 Client::~Client() {
+  for (auto& actor : actors_) {
+    actor.connection->Disconnect();
+  }
   client_->UnsubscribeAll();
   client_->Disconnect();
 }
@@ -39,6 +43,18 @@ Json Client::Request(const std::string& method, const Json& parameters) {
   if (response.GetErrorCode() != 0) {
     throw std::runtime_error(method + " rejected for " + parameters.dump() +
                              ": " + response.GetResult().dump());
+  }
+  return response.GetResult();
+}
+
+Json Client::Complete(sdk::TAsyncResult<sdk::Message>& result,
+                      const std::string& operation) {
+  Check(result.Wait(), operation);
+  microsoft::projectairsim::ResponseMessage response;
+  response.Deserialize(static_cast<std::string>(result.GetResult()));
+  if (response.GetErrorCode() != 0) {
+    throw std::runtime_error(operation +
+                             " rejected: " + response.GetResult().dump());
   }
   return response.GetResult();
 }
@@ -112,7 +128,10 @@ void Client::Load(const std::filesystem::path& directory) {
       Request("GetSimTime", Json::object()).get<std::int64_t>();
   const auto add = [&](const Json& target, const std::filesystem::path& route,
                        const bool waiting) {
-    DisplayActor actor{target, {}, {}, std::nullopt, start_ns, waiting};
+    DisplayActor actor{
+        target, std::make_shared<sdk::Client>(), {}, {}, std::nullopt, start_ns,
+        waiting};
+    Check(actor.connection->Connect(host_), "Fixture connection");
     if (bindings_.value("real_time", false)) {
       std::ifstream file(route);
       if (!file) {
@@ -239,14 +258,15 @@ Json Client::Sample() {
     throw std::runtime_error("Scene clock reset; restart the run");
   }
   previous_time_ = time;
+  auto aircraft = client_->RequestAsync(
+      prefix_ + "/GetObjectPose", {{"object_name", bindings_.at("aircraft")}});
+  std::vector<PendingUpdate> pending;
+  pending.reserve(actors_.size());
   Json sample = {
-      {"sim_ns", time},
-      {"traffic", Json::array()},
-      {"aircraft",
-       Request("GetObjectPose", {{"object_name", bindings_.at("aircraft")}})}};
+      {"sim_ns", time}, {"traffic", Json::array()}, {"aircraft", nullptr}};
   for (std::size_t i = 0; i < actors_.size(); ++i) {
     auto& actor = actors_[i];
-    const auto pose = UpdateDisplay(actor, time);
+    const auto pose = UpdateDisplay(actor, time, pending);
     if (i == 0) {
       sample["target"] = pose;
     } else {
@@ -254,13 +274,26 @@ Json Client::Sample() {
           {{"name", actor.target.at("name")}, {"pose", pose}});
     }
   }
+  // Queue the whole fixture wave before waiting. Serial RPC waits make each
+  // mesh consume another game-thread opportunity and age later actors' poses.
+  // Each actor needs its own REQ socket: a second in-flight request on the
+  // same NNG socket cancels the first. Bound the wave to one sample.
+  sample["aircraft"] = Complete(aircraft, "Aircraft pose");
+  for (auto& update : pending) {
+    if (!Complete(update.result, "Display target update").get<bool>()) {
+      throw std::runtime_error("Display target update failed");
+    }
+    update.actor->previous_pose = std::move(update.pose);
+  }
+  sample["display_updates"] = pending.size();
   sample["fixture_pose_source"] = bindings_.value("real_time", false)
                                       ? "elapsed-time display command"
                                       : "simulator environment actor";
   return sample;
 }
 
-Json Client::UpdateDisplay(DisplayActor& actor, const std::int64_t time_ns) {
+Json Client::UpdateDisplay(DisplayActor& actor, const std::int64_t time_ns,
+                           std::vector<PendingUpdate>& pending) {
   const auto& target = actor.target;
   const auto& display = actor.display;
   const auto pose = FixturePose(actor, time_ns);
@@ -284,14 +317,11 @@ Json Client::UpdateDisplay(DisplayActor& actor, const std::int64_t time_ns) {
   if (actor.previous_pose == visual_pose) {
     return pose;
   }
-  // Only the target's display mesh follows a script. PX4 controls the aircraft.
-  if (!Request("SetObjectPose", {{"object_name", display},
-                                 {"pose", visual_pose},
-                                 {"teleport", true}})
-           .get<bool>()) {
-    throw std::runtime_error("Display target update failed");
-  }
-  actor.previous_pose = visual_pose;
+  // Only fixture meshes follow a script. PX4 controls the aircraft.
+  auto result = actor.connection->RequestAsync(
+      prefix_ + "/SetObjectPose",
+      {{"object_name", display}, {"pose", visual_pose}, {"teleport", true}});
+  pending.push_back({&actor, std::move(visual_pose), std::move(result)});
   return pose;
 }
 }  // namespace raven::simulation

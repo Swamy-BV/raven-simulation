@@ -11,6 +11,7 @@ struct ScenarioRuntime {
   bool stream_video_to_board;
   int render_width;
   int render_height;
+  int capture_rate_hz;
 };
 
 ScenarioRuntime GenerateScenario(const std::filesystem::path& profile,

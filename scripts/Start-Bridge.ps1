@@ -24,7 +24,8 @@ if ($Stop) {
     if (-not $running) { return }
     if ($running.Path -ne $state.executable) { throw 'Bridge process identity changed' }
     Set-Content -LiteralPath (Join-Path $output 'stop') -Value ''
-    if (-not $running.WaitForExit(15000)) { throw 'Bridge did not stop gracefully; inspect bridge.log' }
+    # Each actor connection joins its SDK worker threads during shutdown.
+    if (-not $running.WaitForExit(45000)) { throw 'Bridge did not stop gracefully; inspect bridge.log' }
     Write-Output 'Bridge stopped; recording finalized.'
     return
 }

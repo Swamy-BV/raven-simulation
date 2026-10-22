@@ -16,13 +16,14 @@ namespace raven::simulation {
 Video::Video(const std::string& host, const std::filesystem::path& directory,
              std::function<void(std::int64_t)> source_clock,
              std::int64_t capture_clock_offset_ns, const int width,
-             const int height)
+             const int height, const int capture_rate_hz)
     : frame_log_(directory / "frames.jsonl"),
       encoded_log_(directory / "encoded.jsonl"),
       source_clock_(std::move(source_clock)),
       capture_clock_offset_ns_(capture_clock_offset_ns),
       width_(width),
-      height_(height) {
+      height_(height),
+      capture_rate_hz_(capture_rate_hz) {
   if (!frame_log_ || !encoded_log_) {
     throw std::runtime_error("Cannot create frame logs");
   }
@@ -55,9 +56,9 @@ Video::Video(const std::string& host, const std::filesystem::path& directory,
       std::to_string(static_cast<std::size_t>(width) * height * 3U * 2U) +
       " leaky-type=downstream caps=video/x-raw,format=BGR,width=" +
       std::to_string(width) + ",height=" + std::to_string(height) +
-      ",framerate=30/1 ! queue max-size-buffers=2 leaky=downstream ! " +
-      kConvert + ",width=" + std::to_string(width) +
-      ",height=" + std::to_string(height) +
+      ",framerate=" + std::to_string(capture_rate_hz) +
+      "/1 ! queue max-size-buffers=2 leaky=downstream ! " + kConvert +
+      ",width=" + std::to_string(width) + ",height=" + std::to_string(height) +
       " ! tee name=raw "
       "raw. ! queue max-size-buffers=2 leaky=downstream ! " +
       kEncode +
@@ -87,6 +88,8 @@ Video::Video(const std::string& host, const std::filesystem::path& directory,
                                       {"gstreamer", gst_version_string()},
                                       {"render_width", width},
                                       {"render_height", height},
+                                      {"requested_capture_rate_hz",
+                                       capture_rate_hz},
                                       {"stream_width", 640},
                                       {"stream_height", 360},
                                       {"archive_bitrate_kbps", 12000},
@@ -189,7 +192,7 @@ void Video::Receive(const std::string& bytes) noexcept {
     const auto capture_ns = image.GetTimestamp() + capture_clock_offset_ns_;
     AttachCaptureTime(buffer.get(), capture_ns);
     GST_BUFFER_PTS(buffer.get()) = pts;
-    GST_BUFFER_DURATION(buffer.get()) = GST_SECOND / 30;
+    GST_BUFFER_DURATION(buffer.get()) = GST_SECOND / capture_rate_hz_;
     if (gst_app_src_push_buffer(GST_APP_SRC(source_), buffer.release()) !=
         GST_FLOW_OK) {
       ++rejected_;

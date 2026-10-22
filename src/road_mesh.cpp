@@ -259,8 +259,8 @@ void WriteRoadMesh(const std::vector<RoadPoint>& points, const Json& course,
     throw std::runtime_error("Invalid course surface height");
   }
   const double half = course.value("road_width_m", 14.0) / 2;
-  if (!std::isfinite(half) || half < 4 || half > 8) {
-    throw std::runtime_error("Continuous road width must be 8 to 16 metres");
+  if (!std::isfinite(half) || half < 4 || half > 12) {
+    throw std::runtime_error("Continuous road width must be 8 to 24 metres");
   }
   std::array<Surface, 5>
       surfaces;  // grass, asphalt, sidewalk, white markings, yellow centre line

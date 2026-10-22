@@ -33,6 +33,7 @@ class Client {
  private:
   struct DisplayActor {
     Json target;
+    std::shared_ptr<sdk::Client> connection;
     std::string display;
     Json previous_pose;
     std::optional<Motion> motion;
@@ -40,10 +41,20 @@ class Client {
     bool waiting = false;
   };
 
+  struct PendingUpdate {
+    DisplayActor* actor;
+    Json pose;
+    sdk::TAsyncResult<sdk::Message> result;
+  };
+
   Json Request(const std::string& method, const Json& parameters);
+  Json Complete(sdk::TAsyncResult<sdk::Message>& result,
+                const std::string& operation);
   std::string Spawn(const DisplayActor& actor);
-  Json UpdateDisplay(DisplayActor& actor, std::int64_t time_ns);
+  Json UpdateDisplay(DisplayActor& actor, std::int64_t time_ns,
+                     std::vector<PendingUpdate>& pending);
   Json FixturePose(const DisplayActor& actor, std::int64_t time_ns);
+  std::string host_;
   std::shared_ptr<sdk::Client> client_;
   std::shared_ptr<sdk::World> world_;
   std::string prefix_;

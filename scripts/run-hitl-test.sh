@@ -44,6 +44,19 @@ CONFIG
 )
 fi
 python3 "$root/tests/hitl_preflight.py" "$board"
+parameter_snapshot=
+restore_parameters() {
+  result=$?
+  if [ -n "$parameter_snapshot" ] && [ -f "$parameter_snapshot" ]; then
+    python3 "$root/tests/hitl_parameters.py" restore "$board" "$parameter_snapshot" || result=1
+  fi
+  exit "$result"
+}
+trap restore_parameters EXIT
+if [ -n "$run_dir" ]; then
+  parameter_snapshot="$run_dir/hitl-parameters-before.json"
+  python3 "$root/tests/hitl_parameters.py" apply "$board" "$parameter_snapshot" --config "$run_dir/config"
+fi
 ssh "${args[@]}" root@"$board" 'mkdir -p /run/raven-hitl/tests; cat > /run/raven-hitl/tests/test_hitl.py' < "$root/tests/test_hitl.py"
 ssh "${args[@]}" root@"$board" 'cat > /run/raven-hitl/tests/yaw_profile.py' < "$root/tests/yaw_profile.py"
 ssh "${args[@]}" root@"$board" /bin/sh -s -- "$case_name" "$runtime" "$height" "$cruise" "$follow_seconds" <<'REMOTE' | mirror_output
