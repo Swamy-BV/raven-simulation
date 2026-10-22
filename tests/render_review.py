@@ -55,12 +55,112 @@ def load_review(observations, result, include_ready=False):
 
 
 
+def finite_number(value):
+    try:
+        value = float(value)
+        return value if math.isfinite(value) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def planar_speed(values):
+    if not values or len(values) < 2:
+        return None
+    x, y = (finite_number(v) for v in values[:2])
+    return math.hypot(x, y) if x is not None and y is not None else None
+
+
+def yaw_degrees_error(command, attitude):
+    if command is None or attitude is None:
+        return None
+    w, x, y, z = attitude["q"]
+    measured = math.atan2(2 * (w*z + x*y), 1 - 2 * (y*y + z*z))
+    return math.degrees(math.remainder(command - measured, 2 * math.pi))
+
+
+def draw_telemetry(context, stamp, state, pose, commands, attitudes, positions, text):
+    command = commands.previous(stamp, 250000000)
+    attitude = attitudes.previous(stamp, 250000000)
+    values = state["health"] if state else {}
+    actual = planar_speed(pose["velocity_ned"]) if pose else None
+    requested = planar_speed(command["velocity"]) if command else None
+    yaw = finite_number(command["yaw"]) if command else None
+    error = yaw_degrees_error(yaw, attitude)
+    rate = finite_number(command["yawspeed"]) if command else None
+    fmt = lambda value, digits=1: f"{value:.{digits}f}" if value is not None else "--"
+    field = lambda key: finite_number(values.get(key))
+    mph = lambda value: value * 2.2369362921 if value is not None else None
+    step = field("control_step_ms")
+    lines = [
+        "RECORDED GUIDANCE / PX4",
+        f"Target est.  {fmt(mph(field('target_speed_mps')))} mph",
+        f"Range est.   {fmt(field('target_range_m'))} m",
+        f"Speed cmd/PX4  {fmt(mph(requested))} / {fmt(mph(actual))} mph",
+        f"Yaw error  {fmt(error)} deg",
+        f"Yaw command  {fmt(math.degrees(rate) if rate is not None else None)} deg/s",
+        f"Input age  {fmt(field('source_age_ms'), 0)} ms",
+        f"Control  {fmt(1000 / step if step and step > 0 else None, 0)} Hz | Plan {fmt(field('planning_duration_ms'), 2)} ms",
+    ]
+    context.set_source_rgba(0, 0, 0, .76)
+    context.rectangle(430, 231, 204, 116)
+    context.fill()
+    for i, line in enumerate(lines):
+        text(context, 438, 245 + 13 * i, line, size=10 if i else 10.5)
+
+    # Plot commands actually sent to PX4 against measured PX4 speed. No fixture
+    # trajectory is used, and missing intervals are left disconnected.
+    x, y, width, height = 12, 281, 200, 46
+    context.set_source_rgba(0, 0, 0, .76)
+    context.rectangle(x-5, y-22, width+10, height+28)
+    context.fill()
+    text(context, x, y-9, "Speed 0-50 mph | last 6 s", size=10)
+    context.set_source_rgba(1, 1, 1, .25)
+    context.set_line_width(.6)
+    for limit in (0, 25, 50):
+        ordinate = y + height * (1-limit/50)
+        context.move_to(x, ordinate)
+        context.line_to(x+width, ordinate)
+    context.stroke()
+    for timeline, key, color in ((commands, "velocity", (.2, .8, 1)),
+                                 (positions, "velocity_ned", (1, .75, .15))):
+        left = bisect.bisect_left(timeline.times, stamp-6000000000)
+        right = bisect.bisect_right(timeline.times, stamp)
+        points = timeline.rows[left:right]
+        stride = max(1, len(points)//300)
+        context.set_source_rgb(*color)
+        context.set_line_width(1.2)
+        previous = None
+        for row in points[::stride]:
+            value = planar_speed(row[key])
+            if value is None:
+                previous = None
+                continue
+            px = x + width * (row["stamp_ns"] - stamp + 6000000000) / 6000000000
+            py = y + height * (1-min(50, value*2.2369362921)/50)
+            if previous is None or row["stamp_ns"]-previous > 250000000:
+                context.move_to(px, py)
+            else:
+                context.line_to(px, py)
+            previous = row["stamp_ns"]
+        context.stroke()
+    context.set_source_rgb(.2, .8, 1)
+    context.rectangle(15, 332, 8, 2)
+    context.fill()
+    text(context, 27, 337, "Command", size=9)
+    context.set_source_rgb(1, .75, .15)
+    context.rectangle(92, 332, 8, 2)
+    context.fill()
+    text(context, 104, 337, "PX4 measured", size=9)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run", type=Path)
     parser.add_argument("observations", type=Path)
     parser.add_argument("result", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--telemetry", action="store_true",
+                        help="Show recorded guidance, PX4 response and tracking identity/confidence")
     parser.add_argument("--include-ready", action="store_true",
                         help="Include the stationary lead-in after following readiness")
     parser.add_argument("--start-seconds", type=float,
@@ -76,6 +176,18 @@ def main():
         parser.error("Output already exists")
     result = json.loads(args.result.read_text())
     rows, start, stop, clock_key, controller_label = load_review(args.observations, result, args.include_ready)
+    if args.telemetry and result.get("system_id") != 1:
+        parser.error("Telemetry view currently requires M7 HITL logs")
+    commands = Timeline([])
+    attitudes = Timeline([])
+    if args.telemetry:
+        commands = Timeline([dict(row, stamp_ns=row["received_ros_ns"])
+                             for row in read_rows(args.observations.parent / "setpoints.jsonl")])
+        attitudes = Timeline([dict(row, stamp_ns=row["source_ns"])
+                              for row in read_rows(args.observations.parent / "attitude.jsonl")])
+    selected_ids = list(dict.fromkeys(row["health"].get("selected_track") for row in rows
+                                     if row["kind"] == "following" and row["health"].get("selected_track"))) if args.telemetry else []
+    aliases = {identity: f"{i+1:02d}" for i, identity in enumerate(selected_ids)}
     frames = read_rows(args.run / "frames.jsonl")
     encoded = read_rows(args.run / "encoded.jsonl")
     by_source = {row["source_sim_ns"]: row for row in frames}
@@ -172,6 +284,8 @@ def main():
         text(context, 10, 59, f"{state_label.capitalize()} | {speed_label}{height_label}", size=12)
         text(context, 10, 348, "AirSim | Hardware-in-the-loop" if hardware
              else "AirSim | Software-in-the-loop", size=10)
+        if args.telemetry:
+            draw_telemetry(context, stamp, state, pose, commands, attitudes, position, text)
         if track and track["observations"]:
             counts["with_tracks"] += 1
             selected = track.get("selected")
@@ -187,7 +301,10 @@ def main():
                 context.stroke()
                 if active:
                     class_label = {"0": "person", "2": "car"}.get(str(box["class"]), "target")
-                    text(context, max(2, x), max(68, y - 5), f"Selected {class_label}")
+                    label = f"Selected {class_label}"
+                    if args.telemetry:
+                        label += f" | ID {aliases.get(box['id'], '--')} | det {box['score']:.0%}"
+                    text(context, max(2, x), max(78 if args.telemetry else 68, y - 5), label, size=12)
         context.restore()
 
     encoder.get_by_name("overlay").connect("draw", draw)
@@ -239,6 +356,7 @@ def main():
                   start_seconds=begin / 1e9, end_seconds=end / 1e9,
                   decoder="nvh264dec", encoder="nvh264enc",
                   overlay="Recorded ROS boxes held at most 200 ms; selected object labelled",
+                  telemetry=("Recorded control-time input age; ground-plane range and target-speed estimates; command/PX4 speed and yaw error" if args.telemetry else "disabled"),
                   playback="Original wall-time cadence; no speed-up")
     args.output.with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))

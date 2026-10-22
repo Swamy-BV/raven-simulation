@@ -115,6 +115,8 @@ Offline review overlays use the recorded ROS tracks, selected identity, confiden
 <VENV_PYTHON> ./tests/render_review.py <RUN_DIRECTORY> <OBSERVATIONS_JSONL> <RESULT_JSON> <OUTPUT_MP4>
 ```
 
+Add `--telemetry` to the review command for selected track ID and detection confidence, target estimates, input age, control timing, yaw error and a command-versus-PX4 speed graph. These use recorded ROS/PX4 logs; target speed and range remain explicitly labelled as estimates.
+
 ## Run
 
 Set these values in each WSL terminal:
