@@ -74,6 +74,16 @@
       "offline_validated": true,
       "flight_validated": true,
       "flight_tested": true
+    },
+    "hitl-open-road-six-cars-shuffle-bridge": {
+      "offline_validated": true,
+      "flight_validated": false,
+      "flight_tested": true
+    },
+    "hitl-open-road-six-cars-shuffle": {
+      "offline_validated": true,
+      "flight_validated": true,
+      "flight_tested": true
     }
   },
   "six_car_open_road": {
@@ -269,5 +279,87 @@
       "fast_start": true,
       "playback": "Original wall-time cadence; no speed-up"
     }
+  },
+  "six_car_shuffle_attempts": [
+    {
+      "run": "m7-hitl-open-road-six-cars-shuffle-01",
+      "passed": false,
+      "bridge_occlusion": true,
+      "reviewed_seconds_after_handover": 44.990682045,
+      "selected_visible_fraction": 0.9068736141906873,
+      "recovered_gaps_seconds": [],
+      "terminal_selected_missing_seconds": 4.221585864,
+      "landed_and_disarmed": true,
+      "notes": "Initial lane change and traffic passing succeeded; bridge recovery failed after image-position change.",
+      "profile_adjustments": "Target first lateral move 100-170m, return 300-380m; lead car 11m/s."
+    },
+    {
+      "run": "m7-hitl-open-road-six-cars-shuffle-02",
+      "passed": false,
+      "bridge_occlusion": true,
+      "reviewed_seconds_after_handover": 49.984708204,
+      "selected_visible_fraction": 0.8697394789579158,
+      "recovered_gaps_seconds": [
+        2.596879
+      ],
+      "terminal_selected_missing_seconds": 3.899398888,
+      "landed_and_disarmed": true,
+      "notes": "Completed first lane change before bridge; selected ID recovered after 2.60 seconds, then observations were lost again. Sustained following failed.",
+      "profile_adjustments": "Target return moved to 220-300m and lead car 12m/s; no association or flight-control code changes."
+    }
+  ],
+  "shuffle_followup": "Combined lane-change, traffic-passing and bridge-occlusion recovery is not qualified. Keep original gates and latched hold; investigate camera-motion compensation and post-occlusion association before claiming reliable recovery.",
+  "six_car_shuffle_open_road": {
+    "run": "m7-hitl-open-road-six-cars-shuffle-03",
+    "passed": true,
+    "bridge_occlusion": false,
+    "timed_following_seconds": 61.0,
+    "target_speed_mps": 12,
+    "cars_including_target": 6,
+    "traffic_speed_range_mps": [
+      11.6,
+      12.8
+    ],
+    "selected_car_lane_offsets_m": [
+      0,
+      4.5,
+      0,
+      -4.5,
+      0
+    ],
+    "selected_visible_fraction": 0.9973718791064389,
+    "largest_selected_observation_gap_seconds": 0.152366,
+    "behind_fraction": 1.0,
+    "bearing_p95_degrees": 4.589450533223147,
+    "cross_track_p95_m": 1.4147662716863083,
+    "fixture_stand_off_min_m": 14.043770688182668,
+    "normal_arming": true,
+    "loss_hold_passed": true,
+    "landed": true,
+    "disarmed": true,
+    "visual_review": "Twelve recording samples from 2 to 75 seconds show the original selected car while traffic changes lanes and relative order. No observed physical identity swap; this is not a general ReID accuracy benchmark.",
+    "geometry_validation": {
+      "window_seconds": 86,
+      "sampling_seconds": 0.02,
+      "conservative_vehicle_rectangle_m": [
+        5.2,
+        2.4
+      ],
+      "minimum_rectangle_clearance_m": 2.0974959444594923,
+      "maximum_lateral_acceleration_mps2": 1.1736952605897537
+    },
+    "preview": {
+      "bytes": 6336135,
+      "width": 640,
+      "height": 360,
+      "fps": 24.00684405641959,
+      "decoded_frames": 1824,
+      "duration_seconds": 75.97833333333334,
+      "fast_start": true,
+      "playback": "Original wall-time cadence; no speed-up"
+    },
+    "unmatched_source_frames": 0,
+    "normal_board_services_restored": true,
+    "temporary_m7_parameters_restored": true
   }
 }
