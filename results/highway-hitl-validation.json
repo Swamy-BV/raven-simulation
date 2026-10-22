@@ -1,0 +1,49 @@
+{
+  "scenario": "hitl-highway-traffic",
+  "passed": true,
+  "controller": "i.MX95 Cortex-M7 PX4 HITL, system ID 1",
+  "companion": "i.MX95 Linux, NPU YOLOv8s, ROS 2 DDS guidance",
+  "physics": "Windows ProjectAirSim 1.0.1",
+  "scene_cars": 13,
+  "road_lanes": 3,
+  "tree_row_instances": 202,
+  "target_speed_limit_mph": 40,
+  "curve_speed_policy": "2 m/s2 lateral acceleration limit",
+  "following_seconds": 90.0,
+  "selected_identity_count": 1,
+  "following_fraction": 1.0,
+  "maximum_hover_error_m": 0.3019774202753097,
+  "normal_arming_checks": true,
+  "identity_loss_hold_and_braking_passed": true,
+  "landed": true,
+  "disarmed": true,
+  "recording": {
+    "frames": 3041,
+    "width": 1280,
+    "height": 720,
+    "with_tracks": 3038,
+    "unmatched_frames": 0,
+    "decoder": "nvh264dec",
+    "encoder": "nvh264enc",
+    "playback": "Original wall-time cadence; no speed-up",
+    "hud_layout": "Compact hardware badge, status pill and grouped bottom data dock"
+  },
+  "source_capture_fps": 27.55,
+  "checks": {
+    "windows_cpp17_warnings_as_errors": true,
+    "offline_scenario_checks": 13,
+    "negative_configuration_checks": 3,
+    "clang_format": true,
+    "cmake_lint": true,
+    "shellcheck": true,
+    "python_offline_tests": 5
+  },
+  "notes": [
+    "Only traffic fixtures are scripted; PX4 controls the aircraft.",
+    "Target range and speed in the HUD are vision-derived estimates.",
+    "Drone actual/command are horizontal speed magnitudes, altitude is relative to takeoff, yaw error is command minus measured heading.",
+    "Input age is evaluated by guidance; it is not inference time alone.",
+    "Normal board services and saved M7 parameters restored after flight.",
+    "No lane changes, overtaking, occlusion recovery or obstacle avoidance validated in this run."
+  ]
+}

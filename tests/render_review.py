@@ -78,7 +78,7 @@ def yaw_degrees_error(command, attitude):
     return math.degrees(math.remainder(command - measured, 2 * math.pi))
 
 
-def draw_telemetry(context, stamp, state, pose, commands, attitudes, positions, text):
+def draw_telemetry(context, stamp, state, pose, commands, attitudes, positions, result, text):
     command = commands.previous(stamp, 250000000)
     attitude = attitudes.previous(stamp, 250000000)
     values = state["health"] if state else {}
@@ -86,38 +86,53 @@ def draw_telemetry(context, stamp, state, pose, commands, attitudes, positions, 
     requested = planar_speed(command["velocity"]) if command else None
     yaw = finite_number(command["yaw"]) if command else None
     error = yaw_degrees_error(yaw, attitude)
-    rate = finite_number(command["yawspeed"]) if command else None
     fmt = lambda value, digits=1: f"{value:.{digits}f}" if value is not None else "--"
     field = lambda key: finite_number(values.get(key))
     mph = lambda value: value * 2.2369362921 if value is not None else None
     step = field("control_step_ms")
-    lines = [
-        "RECORDED GUIDANCE / PX4",
-        f"Target est.  {fmt(mph(field('target_speed_mps')))} mph",
-        f"Range est.   {fmt(field('target_range_m'))} m",
-        f"Speed cmd/PX4  {fmt(mph(requested))} / {fmt(mph(actual))} mph",
-        f"Yaw error  {fmt(error)} deg",
-        f"Yaw command  {fmt(math.degrees(rate) if rate is not None else None)} deg/s",
-        f"Input age  {fmt(field('source_age_ms'), 0)} ms",
-        f"Control  {fmt(1000 / step if step and step > 0 else None, 0)} Hz | Plan {fmt(field('planning_duration_ms'), 2)} ms",
+    height = result["origin_ned"][2]-pose["ned"][2] if pose else None
+    # Keep all values in one narrow bottom dock. Scene and selected object stay
+    # unobstructed; the title no longer needs a full-width background.
+    context.set_source_rgba(0, 0, 0, .70)
+    context.rectangle(8, 290, 624, 62)
+    context.fill()
+    context.set_source_rgba(1, 1, 1, .22)
+    context.set_line_width(.5)
+    for divider in (155, 326, 462):
+        context.move_to(divider, 297)
+        context.line_to(divider, 345)
+    context.stroke()
+    groups = [
+        (17, ["TARGET (estimated)",
+              f"Speed   {fmt(mph(field('target_speed_mps')))} mph",
+              f"Range   {fmt(field('target_range_m'))} m"]),
+        (165, ["DRONE / PX4",
+               f"Actual {fmt(mph(actual))} | Cmd {fmt(mph(requested))} mph",
+               f"Alt rel {fmt(height)} m | Yaw err {fmt(error)} deg"]),
+        (336, ["PROCESSING",
+               f"Input age  {fmt(field('source_age_ms'), 0)} ms",
+               f"Control {fmt(1000/step if step and step>0 else None, 0)} Hz",
+               f"Plan {fmt(field('planning_duration_ms'), 2)} ms"]),
     ]
-    context.set_source_rgba(0, 0, 0, .76)
-    context.rectangle(430, 231, 204, 116)
-    context.fill()
-    for i, line in enumerate(lines):
-        text(context, 438, 245 + 13 * i, line, size=10 if i else 10.5)
+    for x, lines in groups:
+        for i, line in enumerate(lines):
+            text(context, x, 303+13*i, line, size=9 if i else 8.5)
 
-    # Plot commands actually sent to PX4 against measured PX4 speed. No fixture
-    # trajectory is used, and missing intervals are left disconnected.
-    x, y, width, height = 12, 281, 200, 46
-    context.set_source_rgba(0, 0, 0, .76)
-    context.rectangle(x-5, y-22, width+10, height+28)
+    # Compare commands sent to PX4 with measured speed, without fixture inputs.
+    x, y, width, height = 473, 319, 148, 25
+    text(context, x, 303, "DRONE SPEED | 0-50 mph | 6 s", size=8)
+    context.set_source_rgb(.2, .8, 1)
+    context.rectangle(x, 308, 7, 2)
     context.fill()
-    text(context, x, y-9, "Speed 0-50 mph | last 6 s", size=10)
-    context.set_source_rgba(1, 1, 1, .25)
-    context.set_line_width(.6)
+    text(context, x+10, 313, "Command", size=7.5)
+    context.set_source_rgb(1, .75, .15)
+    context.rectangle(x+65, 308, 7, 2)
+    context.fill()
+    text(context, x+75, 313, "Measured", size=7.5)
+    context.set_source_rgba(1, 1, 1, .2)
+    context.set_line_width(.5)
     for limit in (0, 25, 50):
-        ordinate = y + height * (1-limit/50)
+        ordinate = y+height*(1-limit/50)
         context.move_to(x, ordinate)
         context.line_to(x+width, ordinate)
     context.stroke()
@@ -128,29 +143,21 @@ def draw_telemetry(context, stamp, state, pose, commands, attitudes, positions, 
         points = timeline.rows[left:right]
         stride = max(1, len(points)//300)
         context.set_source_rgb(*color)
-        context.set_line_width(1.2)
+        context.set_line_width(1)
         previous = None
         for row in points[::stride]:
             value = planar_speed(row[key])
             if value is None:
                 previous = None
                 continue
-            px = x + width * (row["stamp_ns"] - stamp + 6000000000) / 6000000000
-            py = y + height * (1-min(50, value*2.2369362921)/50)
-            if previous is None or row["stamp_ns"]-previous > 250000000:
+            px = x+width*(row["stamp_ns"]-stamp+6000000000)/6000000000
+            py = y+height*(1-min(50, value*2.2369362921)/50)
+            if previous is None or row["stamp_ns"]-previous>250000000:
                 context.move_to(px, py)
             else:
                 context.line_to(px, py)
             previous = row["stamp_ns"]
         context.stroke()
-    context.set_source_rgb(.2, .8, 1)
-    context.rectangle(15, 332, 8, 2)
-    context.fill()
-    text(context, 27, 337, "Command", size=9)
-    context.set_source_rgb(1, .75, .15)
-    context.rectangle(92, 332, 8, 2)
-    context.fill()
-    text(context, 104, 337, "PX4 measured", size=9)
 
 
 def main():
@@ -175,6 +182,9 @@ def main():
     if args.output.exists():
         parser.error("Output already exists")
     result = json.loads(args.result.read_text())
+    bindings_file = args.run / "config" / "bindings.json"
+    bindings = json.loads(bindings_file.read_text()) if bindings_file.exists() else {}
+    vehicle_count = len(bindings.get("traffic", [])) + (1 if bindings.get("target") else 0)
     rows, start, stop, clock_key, controller_label = load_review(args.observations, result, args.include_ready)
     if args.telemetry and result.get("system_id") != 1:
         parser.error("Telemetry view currently requires M7 HITL logs")
@@ -265,27 +275,33 @@ def main():
         track = tracks.previous(stamp, 200000000)
         state = health.previous(stamp, 1500000000)
         pose = position.previous(stamp, 200000000)
-        context.set_source_rgba(0, 0, 0, .72)
-        context.rectangle(0, 0, 640, 70)
-        context.fill()
         hardware = result.get("system_id") == 1
-        title = "Raven | NXP i.MX95" if hardware else "Raven | Visual Tracking"
-        details = ("PX4 / Cortex-M7 | Linux / Cortex-A55 | NPU vision | ROS 2 DDS"
-                   if hardware else "PX4 SITL | Linux vision | ROS 2 DDS")
-        text(context, 10, 18, title)
-        text(context, 10, 37, details, size=11)
-        speed = math.hypot(*pose["velocity_ned"][:2]) if pose else None
-        speed_label = f"Drone {speed * 2.2369362921:.0f} mph" if speed is not None else "Speed unavailable"
+        context.set_source_rgba(0, 0, 0, .62)
+        context.rectangle(8, 8, 259, 34)
+        context.fill()
+        text(context, 15, 22, "Raven | NXP i.MX95" if hardware else "Raven | Visual Tracking", size=11)
+        text(context, 208, 22, f"{vehicle_count} cars" if vehicle_count else "AirSim", size=9)
+        details = ("PX4 M7 | Linux A55 | NPU | ROS 2 | AirSim HITL" if hardware
+                   else "PX4 SITL | Linux vision | ROS 2 | AirSim")
+        text(context, 15, 35, details, size=8.5)
         state_label = state["health"].get("state", "unknown") if state else "unknown"
-        height_label = ""
-        if pose and result.get("system_id") == 1:
-            height = result["origin_ned"][2] - pose["ned"][2]
-            height_label = f" | Alt {height:.1f} m"
-        text(context, 10, 59, f"{state_label.capitalize()} | {speed_label}{height_label}", size=12)
-        text(context, 10, 348, "AirSim | Hardware-in-the-loop" if hardware
-             else "AirSim | Software-in-the-loop", size=10)
+        context.set_source_rgba(0, 0, 0, .62)
+        context.rectangle(527, 8, 105, 24)
+        context.fill()
+        color = (.1, 1, .3) if state_label == "following" else (1, .75, .15)
+        context.set_source_rgb(*color)
+        context.arc(537, 20, 2.5, 0, math.tau)
+        context.fill()
+        text(context, 545, 23, state_label.upper(), size=10)
         if args.telemetry:
-            draw_telemetry(context, stamp, state, pose, commands, attitudes, position, text)
+            draw_telemetry(context, stamp, state, pose, commands, attitudes, position, result, text)
+        else:
+            speed = planar_speed(pose["velocity_ned"]) if pose else None
+            label = f"Drone {speed*2.2369362921:.1f} mph" if speed is not None else "Drone speed unavailable"
+            context.set_source_rgba(0, 0, 0, .62)
+            context.rectangle(8, 331, 175, 21)
+            context.fill()
+            text(context, 15, 345, label, size=10)
         if track and track["observations"]:
             counts["with_tracks"] += 1
             selected = track.get("selected")
@@ -294,7 +310,7 @@ def main():
             for box in track["observations"]:
                 active = box["id"] == selected
                 context.set_source_rgb(*( (.1, 1, .3) if active else (1, .8, .1)))
-                context.set_line_width(2)
+                context.set_line_width(2 if active else 1)
                 x = box["cx"] - box["w"] / 2
                 y = box["cy"] - box["h"] / 2
                 context.rectangle(x, y, box["w"], box["h"])
@@ -303,8 +319,15 @@ def main():
                     class_label = {"0": "person", "2": "car"}.get(str(box["class"]), "target")
                     label = f"Selected {class_label}"
                     if args.telemetry:
-                        label += f" | ID {aliases.get(box['id'], '--')} | det {box['score']:.0%}"
-                    text(context, max(2, x), max(78 if args.telemetry else 68, y - 5), label, size=12)
+                        label = f"{class_label.capitalize()} {aliases.get(box['id'], '--')} | det {box['score']:.0%}"
+                    context.set_font_size(10.5)
+                    label_width = context.text_extents(label)[2]
+                    label_x = max(4, min(x, 633-label_width))
+                    label_y = max(56, y-5)
+                    context.set_source_rgba(0, 0, 0, .55)
+                    context.rectangle(label_x-3, label_y-11, label_width+9, 15)
+                    context.fill()
+                    text(context, label_x, label_y, label, size=10.5)
         context.restore()
 
     encoder.get_by_name("overlay").connect("draw", draw)
@@ -357,6 +380,7 @@ def main():
                   decoder="nvh264dec", encoder="nvh264enc",
                   overlay="Recorded ROS boxes held at most 200 ms; selected object labelled",
                   telemetry=("Recorded control-time input age; ground-plane range and target-speed estimates; command/PX4 speed and yaw error" if args.telemetry else "disabled"),
+                  hud_layout="Compact hardware badge, status pill and grouped bottom data dock",
                   playback="Original wall-time cadence; no speed-up")
     args.output.with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))

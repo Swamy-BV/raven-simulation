@@ -191,25 +191,37 @@ void WriteRoadMesh(const std::vector<RoadPoint>& points, const Json& course,
     Strip(surfaces[3], points, sign * (half - .4), sign * (half - .25), .025,
           false, openings);
   }
-  Strip(surfaces[4], points, -.07, .07, .026, true, openings);
-  const auto roundabout = course.at("roundabout");
-  const auto center = roundabout.at("center_xy_m").get<RoadPoint>();
-  for (const auto value : center) {
-    if (!std::isfinite(value) || std::abs(value) > 10000) {
-      throw std::runtime_error("Invalid roundabout centre");
+  if (course.value("centerline", true)) {
+    Strip(surfaces[4], points, -.07, .07, .026, true, openings);
+  }
+  for (const auto& mark : course.value("lane_markings_m", Json::array())) {
+    const double offset = mark.get<double>();
+    if (!std::isfinite(offset) || std::abs(offset) > half - .5) {
+      throw std::runtime_error("Lane marking is outside the road");
     }
+    Strip(surfaces[3], points, offset - .06, offset + .06, .026, true,
+          openings);
   }
-  const double radius = roundabout.at("radius_m").get<double>();
-  if (!std::isfinite(radius) || radius < 16 || radius > 200) {
-    throw std::runtime_error("Invalid roundabout radius");
-  }
-  const auto ring = Circle(center, radius);
-  Strip(surfaces[1], ring, -half, half, .04);
-  Strip(surfaces[3], ring, -half + .25, -half + .4, .045, false, openings);
-  Strip(surfaces[3], ring, half + .05, half + .25, .15);
-  const auto island = Circle(center, radius - half - .3);
-  for (std::size_t i = 0; i + 1 < island.size(); ++i) {
-    surfaces[0].Quad(center, island[i], island[i + 1], center, .15, 5);
+  if (course.contains("roundabout")) {
+    const auto roundabout = course.at("roundabout");
+    const auto center = roundabout.at("center_xy_m").get<RoadPoint>();
+    for (const auto value : center) {
+      if (!std::isfinite(value) || std::abs(value) > 10000) {
+        throw std::runtime_error("Invalid roundabout centre");
+      }
+    }
+    const double radius = roundabout.at("radius_m").get<double>();
+    if (!std::isfinite(radius) || radius < 16 || radius > 200) {
+      throw std::runtime_error("Invalid roundabout radius");
+    }
+    const auto ring = Circle(center, radius);
+    Strip(surfaces[1], ring, -half, half, .04);
+    Strip(surfaces[3], ring, -half + .25, -half + .4, .045, false, openings);
+    Strip(surfaces[3], ring, half + .05, half + .25, .15);
+    const auto island = Circle(center, radius - half - .3);
+    for (std::size_t i = 0; i + 1 < island.size(); ++i) {
+      surfaces[0].Quad(center, island[i], island[i + 1], center, .15, 5);
+    }
   }
   Json gltf = {
       {"asset", {{"version", "2.0"}, {"generator", "Raven road geometry"}}},
@@ -272,6 +284,9 @@ void WriteRoadMesh(const std::vector<RoadPoint>& points, const Json& course,
   Json primitives = Json::array();
   for (std::size_t material = 0; material < surfaces.size(); ++material) {
     const auto& mesh = surfaces[material];
+    if (mesh.vertices.empty()) {
+      continue;
+    }
     std::vector<float> p, n, uv;
     std::array<float, 3> minimum{std::numeric_limits<float>::max(),
                                  std::numeric_limits<float>::max(),
@@ -312,6 +327,10 @@ Json RoadScenery(const std::vector<RoadPoint>& points, const Json& course) {
   Json result = Json::array();
   double distance = 0;
   unsigned count = 0;
+  const double setback = course.value("building_offset_m", 32.0);
+  if (!std::isfinite(setback) || setback < 24 || setback > 80) {
+    throw std::runtime_error("Invalid building setback");
+  }
   for (std::size_t i = 1; i + 1 < points.size(); ++i) {
     distance += std::hypot(points[i][0] - points[i - 1][0],
                            points[i][1] - points[i - 1][1]);
@@ -322,15 +341,17 @@ Json RoadScenery(const std::vector<RoadPoint>& points, const Json& course) {
     const double yaw = std::atan2(points[i + 1][1] - points[i][1],
                                   points[i + 1][0] - points[i][0]);
     const double side = count % 2 ? 1 : -1;
-    const RoadPoint p{points[i][0] - side * std::sin(yaw) * 32,
-                      points[i][1] + side * std::cos(yaw) * 32};
+    const RoadPoint p{points[i][0] - side * std::sin(yaw) * setback,
+                      points[i][1] + side * std::cos(yaw) * setback};
     // Avoid placing houses inside the island or across a nearby road section.
-    const auto island =
-        course.at("roundabout").at("center_xy_m").get<RoadPoint>();
-    const double island_clearance =
-        course.at("roundabout").at("radius_m").get<double>() + 24;
-    bool clear =
-        std::hypot(p[0] - island[0], p[1] - island[1]) >= island_clearance;
+    bool clear = true;
+    if (course.contains("roundabout")) {
+      const auto island =
+          course.at("roundabout").at("center_xy_m").get<RoadPoint>();
+      const double clearance =
+          course.at("roundabout").at("radius_m").get<double>() + 24;
+      clear = std::hypot(p[0] - island[0], p[1] - island[1]) >= clearance;
+    }
     for (const auto& road : points) {
       if (std::hypot(p[0] - road[0], p[1] - road[1]) < 24) {
         clear = false;
@@ -341,7 +362,7 @@ Json RoadScenery(const std::vector<RoadPoint>& points, const Json& course) {
     if (!clear) {
       continue;
     }
-    const bool tree = count % 3 == 0;
+    const bool tree = !course.contains("trees") && count % 3 == 0;
     result.push_back(
         {{"name", "Roadside" + std::to_string(count)},
          {"asset",
@@ -352,14 +373,59 @@ Json RoadScenery(const std::vector<RoadPoint>& points, const Json& course) {
          {"scale",
           tree ? Json::array({.65, .65, .65}) : Json::array({.75, .75, .75})}});
   }
-  const auto center = course.at("roundabout").at("center_xy_m");
-  result.push_back(
-      {{"name", "IslandTree"},
-       {"asset", course.at("tree_asset")},
-       {"position",
-        {center[0], center[1], course.at("surface_z_m").get<double>() - .15}},
-       {"yaw", 0},
-       {"scale", {.55, .55, .55}}});
+  if (course.contains("roundabout")) {
+    const auto center = course.at("roundabout").at("center_xy_m");
+    result.push_back(
+        {{"name", "IslandTree"},
+         {"asset", course.at("tree_asset")},
+         {"position",
+          {center[0], center[1], course.at("surface_z_m").get<double>() - .15}},
+         {"yaw", 0},
+         {"scale", {.55, .55, .55}}});
+  }
+  if (course.contains("trees")) {
+    const auto& trees = course.at("trees");
+    const double spacing = trees.at("spacing_m").get<double>();
+    const double offset = trees.at("offset_m").get<double>();
+    const double scale = trees.value("scale", .6);
+    if (!std::isfinite(spacing) || spacing < 24 || spacing > 100 ||
+        !std::isfinite(offset) || offset < 16 || offset > 30 ||
+        !std::isfinite(scale) || scale < .25 || scale > 1) {
+      throw std::runtime_error("Invalid roadside tree rows");
+    }
+    unsigned index = 0;
+    for (const double side : {-1.0, 1.0}) {
+      const auto row = OffsetPath(points, side * offset);
+      double travelled = spacing;
+      for (std::size_t i = 0; i + 1 < points.size(); ++i) {
+        if (i > 0) {
+          travelled += std::hypot(points[i][0] - points[i - 1][0],
+                                  points[i][1] - points[i - 1][1]);
+        }
+        if (travelled < spacing) {
+          continue;
+        }
+        travelled = 0;
+        bool clear = true;
+        for (const auto& road : points) {
+          if (std::hypot(row[i][0] - road[0], row[i][1] - road[1]) <
+              course.value("road_width_m", 14.0) / 2 + 8) {
+            clear = false;
+            break;
+          }
+        }
+        if (!clear) {
+          continue;
+        }
+        result.push_back(
+            {{"name", "TreeRow" + std::to_string(++index)},
+             {"asset", course.at("tree_asset")},
+             {"position", {row[i][0], row[i][1], course.at("surface_z_m")}},
+             {"yaw", static_cast<double>(index % 7) * .8},
+             {"scale", {scale, scale, scale}}});
+      }
+    }
+  }
   return result;
 }
 }  // namespace raven::simulation

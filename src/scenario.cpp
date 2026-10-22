@@ -120,8 +120,8 @@ std::vector<Json> ActorProfiles(const Json& settings) {
   }
   std::vector<Json> profiles{settings};
   const auto traffic = settings.value("traffic", Json::array());
-  if (!traffic.is_array() || traffic.size() > 7) {
-    throw std::runtime_error("Traffic must contain at most seven vehicles");
+  if (!traffic.is_array() || traffic.size() > 15) {
+    throw std::runtime_error("Traffic must contain at most fifteen vehicles");
   }
   for (const auto& actor : traffic) {
     auto profile = settings;

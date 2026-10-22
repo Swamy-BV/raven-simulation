@@ -8,6 +8,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <iterator>
+#include <set>
 #include <stdexcept>
 #include <utility>
 
@@ -80,9 +81,12 @@ void Client::Load(const std::filesystem::path& directory) {
       throw std::runtime_error("Road mesh import failed");
     }
   }
+  std::set<std::string> scenery_assets;
   for (const auto& object : bindings_.value("scenery", Json::array())) {
-    Request("ListAssets",
-            {{"name", "^" + object.at("asset").get<std::string>() + "$"}});
+    const auto asset = object.at("asset").get<std::string>();
+    if (scenery_assets.insert(asset).second) {
+      Request("ListAssets", {{"name", "^" + asset + "$"}});
+    }
     const auto& position = object.at("position");
     const auto yaw = object.at("yaw").get<double>();
     const Json pose = {

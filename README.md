@@ -28,6 +28,8 @@ The `hitl-neighborhood` profile uses the packaged neighborhood streets, renders 
 
 The `hitl-suburban-pursuit` profile adds sweeping S-bends and a roundabout with three cars. A textured road is generated as glTF and imported through the simulator API; houses and trees use the packaged assets. Its following test requires 90 seconds, including the roundabout exit. Scene textures are pinned by hash in `scene-assets.json` and installed into the simulator data directory under `assets/` (CC0, [Poly Haven](https://polyhaven.com/license)). Pass that directory with `Start-Bridge.ps1 -AssetDirectory <DATA_DIRECTORY>/assets`. Offline CTest validates geometry without downloaded textures.
 
+The `hitl-highway-traffic` profile uses a three-lane loop with thirteen cars, a 40 mph straight-line speed limit and trees on both verges. Traffic fixtures stay separate from PX4-controlled flight. The review HUD groups estimated target motion, measured/commanded drone motion and processing health in a compact bottom strip.
+
 To add a scenario, add a profile under `scenarios/` and select it in the bridge command. Rounded rectangles and closed segment routes (lines, arcs and tangent Bezier transitions) are supported. New environments also require their assets to be installed in AirSim. This does not imply arbitrary actors or environments already work.
 
 This uses **IAMAI ProjectAirSim v1.0.1**, the continuation linked by Microsoft's original AirSim project. Source and environment pins are in `versions.env`. The PX4 checkout must match Raven's `px4_msgs`; do not substitute an older PX4 release to match an example.
