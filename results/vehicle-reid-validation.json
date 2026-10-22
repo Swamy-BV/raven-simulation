@@ -84,6 +84,11 @@
       "offline_validated": true,
       "flight_validated": true,
       "flight_tested": true
+    },
+    "hitl-open-road-six-cars-dense-shuffle": {
+      "offline_validated": true,
+      "flight_validated": true,
+      "flight_tested": true
     }
   },
   "six_car_open_road": {
@@ -355,6 +360,109 @@
       "fps": 24.00684405641959,
       "decoded_frames": 1824,
       "duration_seconds": 75.97833333333334,
+      "fast_start": true,
+      "playback": "Original wall-time cadence; no speed-up"
+    },
+    "unmatched_source_frames": 0,
+    "normal_board_services_restored": true,
+    "temporary_m7_parameters_restored": true
+  },
+  "six_car_dense_shuffle_open_road": {
+    "run": "m7-hitl-open-road-six-cars-dense-shuffle-01",
+    "passed": true,
+    "bridge_occlusion": false,
+    "timed_following_seconds": 61.0,
+    "target_speed_mps": 12,
+    "cars_including_target": 6,
+    "selected_car_lane_offsets_m": [
+      0,
+      4.5,
+      0,
+      -4.5,
+      0,
+      4.5,
+      0
+    ],
+    "rear_escort": {
+      "behind_fraction": 1.0,
+      "minimum_rear_projection_m": 9.902707935560132,
+      "minimum_rear_projection_entire_recording_m": 9.902707935560132,
+      "samples_reviewed": 15997,
+      "lane_changes": [
+        {
+          "name": "TargetCar",
+          "planned": 6,
+          "started": 6,
+          "completed": 6
+        },
+        {
+          "name": "LeftFrontCar",
+          "planned": 8,
+          "started": 8,
+          "completed": 8
+        },
+        {
+          "name": "RightFrontCar",
+          "planned": 8,
+          "started": 8,
+          "completed": 8
+        },
+        {
+          "name": "LeftRearCar",
+          "planned": 8,
+          "started": 7,
+          "completed": 6
+        },
+        {
+          "name": "RearEscort",
+          "planned": 6,
+          "started": 6,
+          "completed": 6
+        },
+        {
+          "name": "LeadCar",
+          "planned": 8,
+          "started": 8,
+          "completed": 8
+        }
+      ],
+      "total_completed_lane_changes": 42,
+      "reference": "Recorded fixture commands; evaluation only, never a guidance input"
+    },
+    "selected_visible_fraction": 0.9960578186596584,
+    "largest_selected_observation_gap_seconds": 0.235972,
+    "behind_fraction": 1.0,
+    "bearing_p95_degrees": 7.599551535429517,
+    "cross_track_p95_m": 2.686401367187497,
+    "fixture_stand_off_min_m": 14.003467256489941,
+    "normal_arming": true,
+    "loss_hold_passed": true,
+    "landed": true,
+    "disarmed": true,
+    "visual_review": "Twelve recording samples from 2 to 75 seconds show the original selected car and the rear escort. Other cars weave and pass around the pair. No observed physical identity swap; this is not a general ReID accuracy benchmark.",
+    "geometry_validation": {
+      "window_seconds": 101.33344081334761,
+      "sampling_seconds": 0.02,
+      "conservative_vehicle_rectangle_m": [
+        5.2,
+        2.4
+      ],
+      "minimum_rectangle_clearance_m": 1.7961707436330787,
+      "maximum_lateral_acceleration_mps2": 1.6850237412110223,
+      "rear_escort": {
+        "always_behind": true,
+        "world_longitudinal_gap_m": 10,
+        "minimum_heading_projection_m": 9.902707935560132,
+        "maximum_lateral_offset_difference_m": 0.0
+      }
+    },
+    "preview": {
+      "bytes": 6350690,
+      "width": 640,
+      "height": 360,
+      "nominal_fps": 24,
+      "decoded_frames": 1824,
+      "duration_seconds": 75.97041666666667,
       "fast_start": true,
       "playback": "Original wall-time cadence; no speed-up"
     },
