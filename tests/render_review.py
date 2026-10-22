@@ -154,9 +154,14 @@ def main():
         state = health.previous(stamp, 1500000000)
         pose = position.previous(stamp, 200000000)
         context.set_source_rgba(0, 0, 0, .72)
-        context.rectangle(0, 0, 640, 52)
+        context.rectangle(0, 0, 640, 70)
         context.fill()
-        text(context, 10, 18, "Raven | Visual Tracking")
+        hardware = result.get("system_id") == 1
+        title = "Raven | NXP i.MX95" if hardware else "Raven | Visual Tracking"
+        details = ("PX4 / Cortex-M7 | Linux / Cortex-A55 | NPU vision | ROS 2 DDS"
+                   if hardware else "PX4 SITL | Linux vision | ROS 2 DDS")
+        text(context, 10, 18, title)
+        text(context, 10, 37, details, size=11)
         speed = math.hypot(*pose["velocity_ned"][:2]) if pose else None
         speed_label = f"Drone {speed * 2.2369362921:.0f} mph" if speed is not None else "Speed unavailable"
         state_label = state["health"].get("state", "unknown") if state else "unknown"
@@ -164,8 +169,9 @@ def main():
         if pose and result.get("system_id") == 1:
             height = result["origin_ned"][2] - pose["ned"][2]
             height_label = f" | Alt {height:.1f} m"
-        text(context, 10, 39, f"{state_label.capitalize()} | {speed_label}{height_label}")
-        text(context, 10, 348, "Simulation", size=11)
+        text(context, 10, 59, f"{state_label.capitalize()} | {speed_label}{height_label}", size=12)
+        text(context, 10, 348, "AirSim | Hardware-in-the-loop" if hardware
+             else "AirSim | Software-in-the-loop", size=10)
         if track and track["observations"]:
             counts["with_tracks"] += 1
             selected = track.get("selected")
