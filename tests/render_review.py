@@ -152,8 +152,8 @@ def main():
     encoder = Gst.parse_launch(
         "appsrc name=frames format=time block=true is-live=false "
         "! cairooverlay name=overlay ! videoconvert ! video/x-raw,format=NV12 "
-        "! nvh264enc preset=p1 tune=ultra-low-latency rc-mode=cbr "
-        "bitrate=4000 gop-size=30 bframes=0 zerolatency=true "
+        "! nvh264enc preset=p4 tune=ultra-low-latency rc-mode=cbr "
+        "bitrate=8000 gop-size=30 bframes=0 zerolatency=true "
         "! h264parse ! mp4mux faststart=true ! filesink name=output")
     encoder.get_by_name("output").set_property("location", str(args.output))
     first_pts = None

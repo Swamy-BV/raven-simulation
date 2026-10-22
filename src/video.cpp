@@ -28,13 +28,13 @@ Video::Video(const std::string& host, const std::filesystem::path& directory,
 #ifdef _WIN32
   constexpr auto kEncoder = "nvh264enc";
   constexpr auto kEncodePipeline =
-      "nvh264enc preset=p1 tune=ultra-low-latency rc-mode=cbr "
-      "bitrate=2000 gop-size=30 bframes=0 zerolatency=true ";
+      "nvh264enc preset=p4 tune=ultra-low-latency rc-mode=cbr "
+      "bitrate=6000 gop-size=30 bframes=0 zerolatency=true ";
 #else
   constexpr auto kEncoder = "x264enc";
   constexpr auto kEncodePipeline =
       "x264enc tune=zerolatency speed-preset=ultrafast "
-      "bitrate=2000 key-int-max=30 threads=2 ";
+      "bitrate=6000 key-int-max=30 threads=2 ";
 #endif
   // Windows requires NVENC; hardware initialization errors must not silently
   // switch a simulation performance run to software encoding.

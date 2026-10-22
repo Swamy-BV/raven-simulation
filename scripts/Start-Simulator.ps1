@@ -71,6 +71,30 @@ try {
     $runtime = Get-AppxPackage 'Microsoft.DirectXRuntime' | Select-Object -First 1
     if ($runtime) { $env:PATH = $runtime.InstallLocation + ';' + $previousPath }
     $arguments = @('-ResX=960', '-ResY=540', '-nosound', '-unattended', '-dx11', "-graphicsadapter=$GraphicsAdapter")
+    # Keep sensor resolution independent of scene detail. Temporal AA suppresses
+    # moving foliage shimmer; disable photographic blur for perception inputs.
+    $renderSettings = [ordered]@{
+        'sg.ViewDistanceQuality' = 3
+        'sg.AntiAliasingQuality' = 3
+        'sg.ShadowQuality' = 3
+        'sg.PostProcessQuality' = 3
+        'sg.TextureQuality' = 3
+        'sg.EffectsQuality' = 3
+        'sg.FoliageQuality' = 3
+        'sg.ShadingQuality' = 3
+        'sg.ReflectionQuality' = 3
+        'r.AntiAliasingMethod' = 2
+        'r.PostProcessAAQuality' = 6
+        'r.TemporalAA.Quality' = 2
+        'r.MaxAnisotropy' = 16
+        'r.MotionBlurQuality' = 0
+        'r.DepthOfFieldQuality' = 0
+        'r.SceneColorFringeQuality' = 0
+    }
+    $overrides = foreach ($entry in $renderSettings.GetEnumerator()) {
+        '[SystemSettings]:{0}={1}' -f $entry.Key, $entry.Value
+    }
+    $arguments += '-ini:Engine:' + ($overrides -join ',')
     $windowStyle = 'Hidden'
     if ($Visible) { $windowStyle = 'Normal' } else { $arguments += '-RenderOffScreen' }
     $process = Start-Process -FilePath $executable -ArgumentList $arguments -WorkingDirectory $base -WindowStyle $windowStyle -PassThru
@@ -80,6 +104,6 @@ try {
         Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
         throw
     }
-    @{process_id = $process.Id; executable = $executable} | ConvertTo-Json | Set-Content -LiteralPath $stateFile
+    @{process_id = $process.Id; executable = $executable; arguments = $arguments} | ConvertTo-Json | Set-Content -LiteralPath $stateFile
     Write-Output "Simulator process: $($process.Id)"
 } finally { $env:PATH = $previousPath }
