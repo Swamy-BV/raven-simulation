@@ -38,7 +38,7 @@
     "hitl_firmware_installed": true,
     "router_runtime_override_removed": true,
     "simulator_stopped": true,
-    "changes_committed": false,
+    "changes_committed": true,
     "changes_pushed": false
   },
   "next_step": "Fix selected visual identity continuity through bends using the saved detection and association evidence; preserve the validated HITL yaw settings and rerun the unchanged 61-second racetrack gate.",
@@ -461,5 +461,59 @@
         "Additional yaw gain tuning without new evidence"
       ]
     }
+  },
+  "selected_object_orbit": {
+    "passed": true,
+    "controller": "physical i.MX95 Cortex-M7 PX4 HITL",
+    "physics": "Windows ProjectAirSim",
+    "command_path": "ROS 2 DDS over RPMsg",
+    "model": "yolov8s-neutron",
+    "target": "selected stationary car",
+    "radius_m": 12.0,
+    "speed_limit_mps": 1.8,
+    "target_center_height_prior_m": 0.75,
+    "ground_assumption": "level plane",
+    "goal_angle_rad": 6.283185307179586,
+    "measured_angle_rad": 6.271730356267933,
+    "measured_angle_deg": 359.34367965823276,
+    "angle_tolerance_rad": 0.05,
+    "maximum_radius_error_m": 0.1132384169112104,
+    "action_duration_seconds": 85.238991046,
+    "capture_to_observation_ms": {
+      "median": 130.535427,
+      "max": 178.461691
+    },
+    "source_freshness_limit_ms": 350,
+    "fixed_center_consistency_bound_m": 3,
+    "normal_arming": true,
+    "landed": true,
+    "disarmed": true,
+    "selected_identity_retained": true,
+    "moving_target_orbit_validated": false,
+    "obstacle_avoidance": "unavailable; explicit unmapped simulation opt-in",
+    "selection_interface": "ROS SelectTarget by current track ID; no click UI added",
+    "earlier_attempts": [
+      {
+        "configuration": "8 m / 22 degree camera / YOLOv8m",
+        "passed": false,
+        "reason": "clipped ground footpoint expired"
+      },
+      {
+        "configuration": "12 m / footpoint-based centre",
+        "passed": false,
+        "reason": "view-dependent contact points and motion-filter rejection"
+      },
+      {
+        "configuration": "YOLOv8m / 350 ms source budget",
+        "passed": false,
+        "reason": "insufficient source timing margin"
+      },
+      {
+        "configuration": "NXP YOLOv4-tiny",
+        "passed": false,
+        "reason": "car acquisition confidence check failed"
+      }
+    ],
+    "important_scene_correction": "Car asset origin is at the wheels; grounded the fixture instead of offsetting it by an assumed half-height."
   }
 }
