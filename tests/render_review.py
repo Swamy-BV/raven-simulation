@@ -2,8 +2,7 @@
 """Render recorded ROS tracks onto original footage using Windows NVDEC/NVENC.
 
 This offline review tool does not publish observations or command an aircraft.
-Boxes retain their last observed coordinates for at most 200 ms; their age is
-shown. Playback retains the recorded wall-time cadence, including slow simulation.
+Boxes retain their last observed coordinates for at most 200 ms. Playback retains the recorded wall-time cadence, including slow simulation.
 """
 
 import argparse
@@ -55,32 +54,6 @@ def load_review(observations, result, include_ready=False):
     return rows, result[start_key], result["following_end_ros_ns"], "capture_ns", "Actual M7 PX4 | HITL"
 
 
-def car_motion(run, clock_key, first_frame):
-    """Reference-only fixture speed for the review overlay, never control input."""
-    path = run / "poses.jsonl"
-    if not path.exists():
-        return Timeline([])
-    points = read_rows(path)
-    rows = []
-    previous = None
-    offset = first_frame["capture_ns"] - first_frame["source_sim_ns"]
-    for point in points:
-        if previous is None:
-            previous = point
-            continue
-        dt = (point["sample_steady_ns"] - previous["sample_steady_ns"]) / 1e9
-        if dt < .4:
-            continue
-        if "target" in point and "target" in previous:
-            a = point["target"]["translation"]
-            b = previous["target"]["translation"]
-            stamp = (point["sample_steady_ns"] + offset
-                     if clock_key == "capture_ns" else point["sim_ns"])
-            rows.append({"stamp_ns": stamp,
-                         "speed": math.hypot(a["x"] - b["x"], a["y"] - b["y"]) / dt})
-        previous = point
-    return Timeline(rows)
-
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -113,7 +86,6 @@ def main():
     tracks = Timeline([row for row in rows if row["kind"] == "tracks"])
     position = Timeline([row for row in rows if row["kind"] == "position"])
     health = Timeline([row for row in rows if row["kind"] == "following"])
-    car = car_motion(args.run, clock_key, frames[0])
     included = [row for row in encoded_frames
                 if start <= row[clock_key] <= stop]
     if not included:
@@ -182,29 +154,23 @@ def main():
         state = health.previous(stamp, 1500000000)
         pose = position.previous(stamp, 200000000)
         context.set_source_rgba(0, 0, 0, .72)
-        context.rectangle(0, 0, 640, 72)
+        context.rectangle(0, 0, 640, 52)
         context.fill()
-        text(context, 10, 18, f"i.MX95 NPU tracking | {controller_label}")
+        text(context, 10, 18, "Raven | Visual Tracking")
         speed = math.hypot(*pose["velocity_ned"][:2]) if pose else None
-        speed_label = f"{speed:.1f} m/s" if speed is not None else "unavailable"
+        speed_label = f"Drone {speed * 2.2369362921:.0f} mph" if speed is not None else "Speed unavailable"
         state_label = state["health"].get("state", "unknown") if state else "unknown"
-        elapsed = (timestamp - begin) / 1e9
         height_label = ""
         if pose and result.get("system_id") == 1:
             height = result["origin_ned"][2] - pose["ned"][2]
-            height_label = f" | Height {height:.1f}m"
-        car_state = car.previous(stamp, 1500000000)
-        car_speed = f"{car_state['speed']:.1f} m/s" if car_state else "unavailable"
-        text(context, 10, 39,
-             f"{elapsed:.1f}s | Car {car_speed} | Drone {speed_label}")
-        text(context, 10, 59, f"Guidance: {state_label}{height_label}")
+            height_label = f" | Alt {height:.1f} m"
+        text(context, 10, 39, f"{state_label.capitalize()} | {speed_label}{height_label}")
+        text(context, 10, 348, "Simulation", size=11)
         if track and track["observations"]:
             counts["with_tracks"] += 1
             selected = track.get("selected")
             if state and result.get("system_id") == 1:
                 selected = state["health"].get("selected_track")
-            age_ms = (stamp - track["stamp_ns"]) / 1e6
-            text(context, 10, 348, f"Recorded ROS overlay | box age {age_ms:.0f} ms")
             for box in track["observations"]:
                 active = box["id"] == selected
                 context.set_source_rgb(*( (.1, 1, .3) if active else (1, .8, .1)))
@@ -213,14 +179,9 @@ def main():
                 y = box["cy"] - box["h"] / 2
                 context.rectangle(x, y, box["w"], box["h"])
                 context.stroke()
-                identity = box["id"].rsplit(":", 3)[-3:]
-                label = ("SELECTED " if active else "TRACK ") + ":".join(identity)
-                class_label = "car" if str(box["class"]) == "2" else f"class {box['class']}"
-                text(context, max(2, x), max(68, y - 5),
-                     f"{label} | {class_label} | {box['score']:.0%}")
-        else:
-            text(context, 10, 348, "No recent ROS track for this source frame")
-
+                if active:
+                    class_label = {"0": "person", "2": "car"}.get(str(box["class"]), "target")
+                    text(context, max(2, x), max(68, y - 5), f"Selected {class_label}")
         context.restore()
 
     encoder.get_by_name("overlay").connect("draw", draw)
@@ -271,7 +232,7 @@ def main():
                   width=output_size[0], height=output_size[1],
                   start_seconds=begin / 1e9, end_seconds=end / 1e9,
                   decoder="nvh264dec", encoder="nvh264enc",
-                  overlay="Recorded ROS boxes held at most 200 ms; age shown",
+                  overlay="Recorded ROS boxes held at most 200 ms; selected object labelled",
                   playback="Original wall-time cadence; no speed-up")
     args.output.with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))
