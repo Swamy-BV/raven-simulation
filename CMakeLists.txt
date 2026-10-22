@@ -8,7 +8,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(ProjectAirSimCppClient 1.0.1 EXACT REQUIRED)
-add_executable(airsim-bridge src/main.cpp src/client.cpp src/scenario.cpp src/video.cpp src/rtp_time.cpp src/motion.cpp)
+add_executable(
+  airsim-bridge
+  src/main.cpp
+  src/client.cpp
+  src/scenario.cpp
+  src/video.cpp
+  src/rtp_time.cpp
+  src/motion.cpp
+  src/route.cpp
+  src/road_mesh.cpp)
 if(WIN32)
   find_package(microxrcedds_client 2.4.0 EXACT CONFIG REQUIRED)
   set(GSTREAMER_ROOT

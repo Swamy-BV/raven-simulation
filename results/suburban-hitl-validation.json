@@ -1,0 +1,49 @@
+{
+  "scenario": "hitl-suburban-pursuit",
+  "controller": "i.MX95 Cortex-M7 PX4 HITL, system ID 1",
+  "companion": "i.MX95 Cortex-A55 Linux, NPU YOLOv8s, ROS 2 DDS guidance",
+  "simulation": "Windows ProjectAirSim 1.0.1, real-time HIL physics",
+  "passed": true,
+  "course": [
+    "three sweeping S-bends",
+    "roundabout, third exit",
+    "three cars"
+  ],
+  "target_speed_limit_mph": 40,
+  "speed_policy": "Acceleration limited to 1.5 m/s2, lateral acceleration limited to 2 m/s2; slows for bends",
+  "following_seconds": 90.0,
+  "following_sample_count": 14761,
+  "following_fraction": 1.0,
+  "selected_identity_count": 1,
+  "maximum_hover_error_m": 0.30594952417204935,
+  "normal_arming_checks": true,
+  "identity_loss_hold_and_braking_passed": true,
+  "landed": true,
+  "disarmed": true,
+  "recording": {
+    "frames": 2998,
+    "width": 1280,
+    "height": 720,
+    "with_tracks": 2995,
+    "unmatched_frames": 0,
+    "decoder": "nvh264dec",
+    "encoder": "nvh264enc",
+    "playback": "Original wall-time cadence; no speed-up"
+  },
+  "checks": {
+    "windows_cpp17_build_warnings_as_errors": true,
+    "offline_scenario_checks": 12,
+    "negative_geometry_checks": 3,
+    "clang_format": true,
+    "cmake_lint": true,
+    "shellcheck": true,
+    "powershell_parse": true
+  },
+  "notes": [
+    "Car fixtures use scripted elapsed-time display poses. Aircraft is controlled by PX4, not scripted.",
+    "Initial layout completed 90 seconds following after one pre-arm check refusal while the estimator settled.",
+    "Final layout passed again after removing an island house and opening junction markings.",
+    "Normal board services and saved M7 parameters restored after testing.",
+    "Overtaking, deliberate occlusions and obstacle avoidance are not validated by this run."
+  ]
+}

@@ -11,6 +11,9 @@
 #include <utility>
 #include <vector>
 
+#include "road_mesh.h"
+#include "route.h"
+
 namespace raven::simulation {
 namespace {
 using Json = nlohmann::json;
@@ -33,6 +36,10 @@ void Write(const std::filesystem::path& path, const Json& value) {
 }
 
 std::vector<Point> Route(const Json& route) {
+  if (route.at("type") == "segments") {
+    auto points = SegmentRoute(route);
+    return OffsetPath(points, route.value("lane_offset_m", 0.0));
+  }
   if (route.at("type") != "rounded_rectangle") {
     throw std::runtime_error("Unsupported route type");
   }
@@ -83,6 +90,14 @@ std::vector<Point> Route(const Json& route) {
 Json InsetRoute(Json route, const double inset) {
   if (!std::isfinite(inset)) {
     throw std::runtime_error("Invalid traffic route inset");
+  }
+  if (route.at("type") == "segments") {
+    const double offset = route.value("lane_offset_m", 0.0) + inset;
+    if (std::abs(offset) > 5) {
+      throw std::runtime_error("Traffic lane offset exceeds five metres");
+    }
+    route["lane_offset_m"] = offset;
+    return route;
   }
   auto minimum = route.at("min_xy_m").get<Point>();
   auto maximum = route.at("max_xy_m").get<Point>();
@@ -253,6 +268,9 @@ Json Course(const Json& profile) {
     return objects;
   }
   const auto& course = profile.at("course");
+  if (course.value("type", std::string{}) == "continuous") {
+    return RoadScenery(Route(profile.at("route")), course);
+  }
   const auto spacing = course.at("tile_spacing_m").get<double>();
   const auto width = course.at("road_width_m").get<double>();
   const auto height = course.at("surface_z_m").get<double>();
@@ -508,9 +526,18 @@ void ValidateScenario(const std::filesystem::path& profile,
                : "traffic-" + std::to_string(i) + "-trajectory.json";
     Write(directory / filename, trajectory);
   }
+  Json road_mesh = nullptr;
+  if (settings.contains("course") &&
+      settings.at("course").value("type", std::string{}) == "continuous") {
+    const auto& course = settings.at("course");
+    WriteRoadMesh(Route(settings.at("route")), course, directory, false);
+    road_mesh = {{"file", "road.gltf"},
+                 {"surface_z_m", course.at("surface_z_m")}};
+  }
   Write(directory / "scene.jsonc", scene);
   Write(directory / "bindings.json",
         {{"real_time", IsHitl(settings)},
+         {"road_mesh", road_mesh},
          {"target_start_on_ready",
           settings.value("target_start_on_ready", false)},
          {"aircraft", settings.at("aircraft").at("name")},
@@ -530,7 +557,15 @@ ScenarioRuntime GenerateScenario(const std::filesystem::path& profile,
                                  const std::string& board,
                                  const std::string& serial_port) {
   ValidateScenario(profile, directory);
-  const bool hitl = IsHitl(Read(profile));
+  const auto profile_settings = Read(profile);
+  if (profile_settings.contains("course") &&
+      profile_settings.at("course").value("type", std::string{}) ==
+          "continuous") {
+    // Offline validation builds geometry without needing downloaded textures.
+    WriteRoadMesh(Route(profile_settings.at("route")),
+                  profile_settings.at("course"), directory, true);
+  }
+  const bool hitl = IsHitl(profile_settings);
   const ScenarioRuntime runtime{
       hitl ? FlightController::kHitl : FlightController::kSitl,
       Read(profile).value("stream_video_to_board", true),

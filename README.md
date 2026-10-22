@@ -1,16 +1,16 @@
 # Raven Simulation
 
-AirSim scenarios and hardware-connected PX4/ROS validation for Raven. Windows renders the neighbourhood and runs the C++17 NVENC video sender; PX4 SITL runs in WSL; the i.MX95 board decodes video and runs NPU detection, tracking and following.
+AirSim scenarios and hardware-connected PX4/ROS validation for Raven. Windows renders the neighbourhood and runs the C++17 NVENC video sender; PX4 runs on the real Cortex-M7 in HITL, or in isolated WSL SITL tests; i.MX95 Linux decodes video and runs NPU detection, tracking and guidance.
 
 ```mermaid
 flowchart LR
-    AirSim[AirSim on Windows] <-->|MAVLink HIL| PX4[PX4 SITL in WSL]
+    AirSim[AirSim on Windows] <-->|MAVLink HIL| PX4[PX4: Cortex-M7 HITL or WSL SITL]
     AirSim -->|Camera frames| Bridge[C++ bridge and NVENC on Windows]
     Bridge -->|H.264 RTP| Media[Media capture on board]
-    Bridge -->|Simulation clock| ROS[ROS 2 on board]
+    Bridge -->|SITL clock only| ROS[ROS 2 on board]
     Media --> Vision[NPU vision and tracking]
     Vision --> Follower[Selected-target follower]
-    PX4 <-->|DDS /simulation| ROS
+    PX4 <-->|ROS 2 DDS| ROS
     ROS <--> Follower
 ```
 
@@ -26,7 +26,9 @@ Scenario profiles own the scene ID, aircraft spawn, target asset, visual alignme
 
 The `hitl-neighborhood` profile uses the packaged neighborhood streets, renders and records 1280×720, and sends a CUDA-downscaled 640×360 stream to the board. Real-time car fixtures use double-precision elapsed time in the host bridge, avoiding the packaged simulator's float-uptime trajectory quantization. PX4 continues to control the aircraft; fixture poses are never follower inputs.
 
-To add a scenario, add a profile under `scenarios/` and select it in the bridge command. Rounded-rectangle routes are currently supported; new route types need a generator in `src/scenario.cpp`. New environments also require their assets to be installed in AirSim. This does not imply arbitrary actors or environments already work.
+The `hitl-suburban-pursuit` profile adds sweeping S-bends and a roundabout with three cars. A textured road is generated as glTF and imported through the simulator API; houses and trees use the packaged assets. Its following test requires 90 seconds, including the roundabout exit. Scene textures are pinned by hash in `scene-assets.json` and installed into the simulator data directory under `assets/` (CC0, [Poly Haven](https://polyhaven.com/license)). Pass that directory with `Start-Bridge.ps1 -AssetDirectory <DATA_DIRECTORY>/assets`. Offline CTest validates geometry without downloaded textures.
+
+To add a scenario, add a profile under `scenarios/` and select it in the bridge command. Rounded rectangles and closed segment routes (lines, arcs and tangent Bezier transitions) are supported. New environments also require their assets to be installed in AirSim. This does not imply arbitrary actors or environments already work.
 
 This uses **IAMAI ProjectAirSim v1.0.1**, the continuation linked by Microsoft's original AirSim project. Source and environment pins are in `versions.env`. The PX4 checkout must match Raven's `px4_msgs`; do not substitute an older PX4 release to match an example.
 

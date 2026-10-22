@@ -1,0 +1,33 @@
+{
+  "license_source": "https://polyhaven.com/license",
+  "assets": [
+    {
+      "file": "asphalt_02_diff_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_diff_1k.jpg",
+      "sha256": "1aa5ce99f58a625c71d48cfc3e68b65ca85ccb00f39e045c0a928608a0ea25ed",
+      "source": "https://polyhaven.com/a/asphalt_02",
+      "license": "CC0-1.0"
+    },
+    {
+      "file": "asphalt_02_nor_gl_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_nor_gl_1k.jpg",
+      "sha256": "42a1c381b53204e83a982db2864479a30bc127bbdeebb1006f8ee51bff099df3",
+      "source": "https://polyhaven.com/a/asphalt_02",
+      "license": "CC0-1.0"
+    },
+    {
+      "file": "aerial_grass_rock_diff_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_grass_rock/aerial_grass_rock_diff_1k.jpg",
+      "sha256": "57b8041bfe0d0f01430e4dbaad45e7ddddf0a9fc97317f90dbc51f7b0d9e1b5d",
+      "source": "https://polyhaven.com/a/aerial_grass_rock",
+      "license": "CC0-1.0"
+    },
+    {
+      "file": "aerial_grass_rock_nor_gl_1k.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_grass_rock/aerial_grass_rock_nor_gl_1k.jpg",
+      "sha256": "1aa3e23bff453f152e089b9f83aa36b4901651e019f7e2ca01d5331a9bbbda78",
+      "source": "https://polyhaven.com/a/aerial_grass_rock",
+      "license": "CC0-1.0"
+    }
+  ]
+}

@@ -12,6 +12,7 @@ param(
     [string]$GStreamerRoot,
     [string]$GStreamerPython,
     [string]$SerialPort,
+    [string]$AssetDirectory,
     [switch]$Stop
 )
 $ErrorActionPreference = 'Stop'
@@ -41,6 +42,9 @@ $start.UseShellExecute = $false
 $start.CreateNoWindow = $true
 foreach ($argument in @($SimulatorHost, $BoardAddress, $templatePath, $scenarioPath, $output, "$Seconds", '--log-to-run')) {
     $start.ArgumentList.Add($argument)
+}
+if ($AssetDirectory) {
+    $start.Environment['RAVEN_SIM_ASSETS'] = (Resolve-Path -LiteralPath $AssetDirectory).Path
 }
 if ($SerialPort) {
     $start.ArgumentList.Add('--serial-port')

@@ -29,21 +29,24 @@ if [ -n "${RAVEN_SIM_SSH_SOCKET:-}" ]; then
 fi
 height=4.5
 cruise=3.5
+follow_seconds=61
 if [ -n "$run_dir" ]; then
-  read -r height cruise < <(python3 - "$run_dir/config/bindings.json" <<'CONFIG'
+  read -r height cruise follow_seconds < <(python3 - "$run_dir/config/bindings.json" <<'CONFIG'
 import json, sys
 settings = json.load(open(sys.argv[1])).get("acceptance", {})
 height = float(settings.get("height_m", 4.5))
 cruise = float(settings.get("minimum_target_speed_mps", 3.5))
 assert 2 <= height <= 12 and 0 < cruise < 30
-print(height, cruise)
+seconds = float(settings.get("following_seconds", 61))
+assert 61 <= seconds <= 180
+print(height, cruise, seconds)
 CONFIG
 )
 fi
 python3 "$root/tests/hitl_preflight.py" "$board"
 ssh "${args[@]}" root@"$board" 'mkdir -p /run/raven-hitl/tests; cat > /run/raven-hitl/tests/test_hitl.py' < "$root/tests/test_hitl.py"
 ssh "${args[@]}" root@"$board" 'cat > /run/raven-hitl/tests/yaw_profile.py' < "$root/tests/yaw_profile.py"
-ssh "${args[@]}" root@"$board" /bin/sh -s -- "$case_name" "$runtime" "$height" "$cruise" <<'REMOTE' | mirror_output
+ssh "${args[@]}" root@"$board" /bin/sh -s -- "$case_name" "$runtime" "$height" "$cruise" "$follow_seconds" <<'REMOTE' | mirror_output
 set -e
 cd /run/raven-hitl/tests
 export ROS_LOG_DIR=/tmp/raven-hitl-log
@@ -57,6 +60,6 @@ if [ -n "$2" ]; then
   version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
   export PYTHONPATH="$2/lib/python$version/site-packages${PYTHONPATH:+:$PYTHONPATH}"
 fi
-export RAVEN_M7_HITL=1 RAVEN_HITL_HEIGHT_M="$3" RAVEN_HITL_CRUISE_MPS="$4"
+export RAVEN_M7_HITL=1 RAVEN_HITL_HEIGHT_M="$3" RAVEN_HITL_CRUISE_MPS="$4" RAVEN_HITL_FOLLOW_SECONDS="$5"
 python3 -u -m unittest -v "test_hitl.HitlTests.test_${1}_and_land"
 REMOTE

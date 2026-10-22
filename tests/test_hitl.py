@@ -55,7 +55,8 @@ class HitlTests(unittest.TestCase):
         goal = None
         arm_requested = False
         follow_records = []
-        recording_seconds = 61.0
+        recording_seconds = float(os.environ.get("RAVEN_HITL_FOLLOW_SECONDS", "61"))
+        self.assertTrue(61 <= recording_seconds <= 180)
         height_m = float(os.environ.get("RAVEN_HITL_HEIGHT_M", "4.5"))
         minimum_speed_mps = float(os.environ.get("RAVEN_HITL_CRUISE_MPS", "3.5"))
         self.assertTrue(2 <= height_m <= 12)

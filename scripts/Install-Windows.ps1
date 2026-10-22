@@ -33,3 +33,16 @@ if (-not (Test-Path -LiteralPath $executable)) {
 }
 if (-not (Test-Path -LiteralPath $executable)) { throw 'Simulator executable not found after extraction' }
 Write-Output "Verified simulator: $executable"
+
+$assetDirectory = Join-Path $DataDirectory 'assets'
+New-Item -ItemType Directory -Path $assetDirectory -Force | Out-Null
+$manifest = Get-Content (Join-Path $PSScriptRoot '../scene-assets.json') -Raw | ConvertFrom-Json
+foreach ($asset in $manifest.assets) {
+    if ([IO.Path]::GetFileName($asset.file) -ne $asset.file) { throw 'Invalid scene asset filename' }
+    $file = Join-Path $assetDirectory $asset.file
+    if (-not (Test-Path -LiteralPath $file)) { Invoke-WebRequest -Uri $asset.url -OutFile $file }
+    if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() -ne $asset.sha256) {
+        throw "Scene asset checksum mismatch: $($asset.file)"
+    }
+}
+Write-Output "Verified scene textures: $assetDirectory"

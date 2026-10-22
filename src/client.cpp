@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <fstream>
 #include <initializer_list>
+#include <iterator>
 #include <stdexcept>
 #include <utility>
 
@@ -52,6 +53,33 @@ void Client::Load(const std::filesystem::path& directory) {
         "Scene loading");
   prefix_ = world_->GetParentTopic();
   actors_.clear();
+  if (!bindings_.value("road_mesh", Json()).is_null()) {
+    const auto& mesh = bindings_.at("road_mesh");
+    std::ifstream file(directory / mesh.at("file").get<std::string>(),
+                       std::ios::binary);
+    if (!file) {
+      throw std::runtime_error("Cannot read generated road mesh");
+    }
+    const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),
+                                          std::istreambuf_iterator<char>()};
+    Request(
+        "spawnObjectFromFile",
+        {{"object_name", "PursuitRoad"},
+         {"file_format", "gltf"},
+         {"byte_array", Json::binary(bytes)},
+         {"is_binary", false},
+         {"pose",
+          {{"frame_id", "DEFAULT_ID"},
+           {"translation", {{"x", 0}, {"y", 0}, {"z", mesh.at("surface_z_m")}}},
+           {"rotation", {{"w", 1}, {"x", 0}, {"y", 0}, {"z", 0}}}}},
+         {"scale", {1, 1, 1}},
+         {"enable_physics", false}});
+    const auto bounds =
+        Request("GetObjectPose", {{"object_name", "PursuitRoad"}});
+    if (!std::isfinite(bounds.at("translation").at("z").get<double>())) {
+      throw std::runtime_error("Road mesh import failed");
+    }
+  }
   for (const auto& object : bindings_.value("scenery", Json::array())) {
     Request("ListAssets",
             {{"name", "^" + object.at("asset").get<std::string>() + "$"}});
