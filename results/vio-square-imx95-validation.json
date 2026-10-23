@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-22",
+  "platform": "NXP FRDM-IMX95 Cortex-A55 Linux",
+  "ros_distro": "jazzy",
+  "mode": "shadow; AirSim internal SimpleFlight pilot; VIO controls no aircraft",
+  "meta_raven_base_commit": "f35f25adda13fc4614129cf685636a861a441918",
+  "uncommitted_worktree": true,
+  "upstream": {
+    "openvins_commit": "69488123ed9362dd44b6f28e7f4680abbff1442b",
+    "openvins_version": "2.7.0",
+    "projectairsim_commit": "09755454b8d82b0231af7e59fd1ab8f980ff32c5",
+    "projectairsim_version": "1.0.1"
+  },
+  "build": {
+    "targets": [
+      "visual-odometry",
+      "ov-msckf",
+      "projectairsim-ros2-cpp"
+    ],
+    "tasks": 5549,
+    "exit_code": 0,
+    "package_qa": "passed",
+    "full_image_built": false
+  },
+  "profile": "scenarios/localization/square.json",
+  "calibration": {
+    "source": "declared simulator geometry; independently checked against CameraInfo and camera/body transforms",
+    "resolution": [
+      640,
+      480
+    ],
+    "intrinsics": [
+      320,
+      320,
+      320,
+      240
+    ],
+    "pitch_down_deg": 20,
+    "imu_ros_axes": "FLU",
+    "camera_axes": "right, down, forward"
+  },
+  "method": "Acquisition-time matching; first matched body orientation and position rigid alignment; no scale or whole-trajectory fitting; ground truth is evaluator input only.",
+  "m7": {
+    "remained_disarmed": true,
+    "visual_odometry_input_publishers": 0,
+    "fusion_enabled_by_this_test": false
+  },
+  "runs": [
+    {
+      "alignment": "first matched body orientation and position; rigid; no scale fitting",
+      "counts": {
+        "truth": 10989,
+        "odometry": 10287,
+        "imu": 10992,
+        "image": 2702
+      },
+      "rates_hz": {
+        "truth": 100.12028721744065,
+        "odometry": 98.49573136391817,
+        "imu": 100.1476206544041,
+        "image": 24.440774095508573
+      },
+      "maximum_stamp_gap_seconds": {
+        "truth": 0.0400063,
+        "odometry": 0.0400026,
+        "imu": 0.0400026,
+        "image": 0.048005
+      },
+      "comparable": true,
+      "compared_seconds": 104.43092159999999,
+      "reference_duration_seconds": 109.7479872,
+      "odometry_time_coverage_fraction": 0.9515520445007304,
+      "unobserved_reference_tail_seconds": 0.004005800000001614,
+      "initialization_seconds_from_observer_start": 5.3130598,
+      "reference_path_m": 42.25606489063209,
+      "position_rmse_m": 0.8316371784571644,
+      "position_error_m": {
+        "mean": 0.818409182746668,
+        "p95": 0.942295320295399,
+        "maximum": 1.3680083178134566
+      },
+      "end_position_error_m": 0.8714570310476364,
+      "end_drift_percent_of_path": 2.062324149925359,
+      "initial_alignment_truth_delta_ms": 3.9955000000002627,
+      "latest_received_imu_minus_odometry_ms": {
+        "mean": -5.689741255954116,
+        "p95": 4.0002,
+        "maximum": 24.0021
+      },
+      "route_complete": true,
+      "landed_and_disarmed": true,
+      "failures": [],
+      "initialization_wall_seconds": 5.301937775,
+      "run": "flight-10",
+      "resources": {
+        "wall_seconds": 110.54232810800022,
+        "cpu_percent_one_core": 161.80193511507517,
+        "cpu_quota_available": false,
+        "throttled_seconds": null,
+        "memory_peak_bytes": 77918208
+      },
+      "control_error": null,
+      "position_axis_rmse_m": [
+        0.419533447317493,
+        0.09004024879061816,
+        0.7123937371789693
+      ],
+      "end_position_error_xyz_m": [
+        -0.4567741649098911,
+        -0.07221133303580629,
+        -0.7386340383535168
+      ]
+    },
+    {
+      "alignment": "first matched body orientation and position; rigid; no scale fitting",
+      "counts": {
+        "truth": 11201,
+        "odometry": 10426,
+        "imu": 11203,
+        "image": 2700
+      },
+      "rates_hz": {
+        "truth": 101.93172968778482,
+        "odometry": 99.69903867929929,
+        "imu": 101.93137767275284,
+        "image": 24.398507676261378
+      },
+      "maximum_stamp_gap_seconds": {
+        "truth": 0.0440083,
+        "odometry": 0.0360034,
+        "imu": 0.0360027,
+        "image": 0.048004
+      },
+      "comparable": true,
+      "compared_seconds": 104.5646993,
+      "reference_duration_seconds": 109.8774644,
+      "odometry_time_coverage_fraction": 0.9516482735653664,
+      "unobserved_reference_tail_seconds": 5.29999999798747e-06,
+      "initialization_seconds_from_observer_start": 5.3127598,
+      "reference_path_m": 42.24734628247219,
+      "position_rmse_m": 1.2569428202031536,
+      "position_error_m": {
+        "mean": 1.237722464441965,
+        "p95": 1.3756698096269995,
+        "maximum": 1.7725572912086727
+      },
+      "end_position_error_m": 1.2266590600668328,
+      "end_drift_percent_of_path": 2.90351742300026,
+      "initial_alignment_truth_delta_ms": 0.0045999999995771645,
+      "latest_received_imu_minus_odometry_ms": {
+        "mean": -6.200108488394398,
+        "p95": 4.0001,
+        "maximum": 24.0016
+      },
+      "route_complete": true,
+      "landed_and_disarmed": true,
+      "failures": [],
+      "initialization_wall_seconds": 5.312395623,
+      "run": "flight-11",
+      "resources": {
+        "wall_seconds": 110.68527509299929,
+        "cpu_percent_one_core": 161.45445710809184,
+        "cpu_quota_available": false,
+        "throttled_seconds": null,
+        "memory_peak_bytes": 77070336
+      },
+      "control_error": null,
+      "position_axis_rmse_m": [
+        0.4229789981322262,
+        0.08714278215002381,
+        1.180423718805443
+      ],
+      "end_position_error_xyz_m": [
+        -0.15136006643600908,
+        0.07258879549117658,
+        -1.2151186965484781
+      ]
+    }
+  ],
+  "qualified_for_px4_fusion": false,
+  "remaining": [
+    "Improve initialization/climb error and qualify drift across additional motion and lighting cases.",
+    "Resolve clean shutdown: SIGTERM reached finalization, but the node required a timeout kill after a class-loader cleanup warning.",
+    "Validate frame, covariance, reset and timestamp handling before adding the PX4 external-odometry adapter.",
+    "CPU quotas are unavailable on the current kernel; recorded CPU usage is measured rather than quota-enforced."
+  ],
+  "development_failures": [
+    "Early runs diverged; an intermediate run hit the IMU coverage assertion. Final two runs below use the callback ownership and execution fixes; assertions remain enabled."
+  ],
+  "patch_sha256": {
+    "0001-use-toolchain-flags-and-cxx17.patch": "04567fbbf7febb959f8387270b25d41c4f004b5d1edea4ef7992f1b5934f5c52",
+    "0002-use-sensor-data-image-qos.patch": "eb9bd8f2efdcb267a10cd152889bec32e0ab780077a92da7be011442dad02171",
+    "0003-use-jazzy-image-headers.patch": "6d3426b7924f2b0b76c41e49cdde22c2fdef7c5ce60283f826f8c74895efc34b",
+    "0004-bound-ros-executor-and-imu-history.patch": "eb5f4917942954f0c7c3632c1d293369bd1aced6cd2ea2d2e57bfde592189de1",
+    "0005-own-asynchronous-imu-timestamp.patch": "1d0a4b28b34fed354530f84c8f88d6e0c6877edec72448152981c0bebc765580",
+    "0006-separate-inertial-callback-group.patch": "aab95469c2d6a7a1a9fd9fc40277c118fa3a49815ce241651572ffb3017da8b1"
+  },
+  "runtime_sha256": {
+    "libov_msckf_lib.so": "2c603e05e69ea198a924ffefae97b4e522c3a918a4589beadac40ecdd88d448b",
+    "ov_msckf/run_subscribe_msckf": "55e2e812651fbe9dd46df1528b7cec11213638db0a2319542b9aaeecbb820290"
+  },
+  "simulation_base_commit": "b746657604fce680dd5c023cb78624c1677ee59b",
+  "runtime_hashes_verified_on_board": true,
+  "shutdown": {
+    "sigterm_reached_finalization": true,
+    "test_stop_timeout_seconds": 5,
+    "required_timeout_kill": true,
+    "class_loader_cleanup_warning": true
+  }
+}

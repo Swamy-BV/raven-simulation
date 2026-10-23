@@ -1,0 +1,4 @@
+# Host-side profile preparation and drift analysis; runtime uses the ROS SDK.
+commentjson==0.9.0
+numpy==2.2.6
+PyYAML==6.0.3

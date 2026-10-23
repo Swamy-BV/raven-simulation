@@ -1,0 +1,35 @@
+{
+  "id": "VioSquare",
+  "robot": "VioDrone",
+  "origin_ned_m": [-1.0, 8.0, -1.0],
+  "physics_step_ns": 4000000,
+  "camera": {
+    "id": "Navigation",
+    "width": 640,
+    "height": 480,
+    "rate_hz": 25,
+    "horizontal_fov_deg": 90.0,
+    "pitch_down_deg": 20.0,
+    "position_frd_m": [0.3, 0.0, 0.0]
+  },
+  "imu": {
+    "id": "NavigationImu",
+    "accelerometer_noise_density": 0.002353,
+    "accelerometer_bias_stability": 0.000353,
+    "accelerometer_tau_s": 800.0,
+    "gyroscope_noise_density": 0.0000872644,
+    "gyroscope_bias_stability": 0.0000223014,
+    "gyroscope_tau_s": 500.0
+  },
+  "flight": {
+    "speed_mps": 1.0,
+    "settle_seconds": 5.0,
+    "waypoints_relative_ned_m": [
+      [0.0, 0.0, -8.0],
+      [6.0, 0.0, -8.0],
+      [6.0, 6.0, -8.0],
+      [0.0, 6.0, -8.0],
+      [0.0, 0.0, -8.0]
+    ]
+  }
+}
