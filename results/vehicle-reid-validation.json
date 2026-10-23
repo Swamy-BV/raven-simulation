@@ -469,5 +469,49 @@
     "unmatched_source_frames": 0,
     "normal_board_services_restored": true,
     "temporary_m7_parameters_restored": true
+  },
+  "five_bridge_shuffle_latest": {
+    "run": "m7-hitl-open-road-five-bridges-09",
+    "flight_test_passed": false,
+    "timed_following_seconds": 61.002859858,
+    "video_seconds_after_handover": 76.00313084,
+    "scene": {
+      "vehicles": 6,
+      "rear_escort_gap_m": 10,
+      "bridge_count": 5,
+      "bridge_deck_depth_m": 20,
+      "bridge_deck_width_m": 32,
+      "target_speed_mps": 12,
+      "height_m": 8,
+      "camera_horizontal_fov_degrees": 60,
+      "camera_pitch_down_degrees": 25
+    },
+    "same_identity_recovered_at_all_five_bridges": true,
+    "primary_bridge_recovery_gaps_seconds": [
+      2.099084,
+      1.495141,
+      1.823476,
+      1.571595,
+      1.999773
+    ],
+    "active_following_fraction": 0.8397879414143229,
+    "required_active_following_fraction": 0.9,
+    "failure": "Full timed window completed, but braking during visual occlusions exceeded the existing active-following budget. No acceptance criterion was relaxed.",
+    "rear_formation_behind_fraction": 1.0,
+    "rear_formation_bearing_p95_degrees": 7.872457391968801,
+    "minimum_stand_off_m": 14.01617433886509,
+    "render_pose_identity_check": {
+      "observed_frames": 661,
+      "target_best_projected_fixture_box_fraction": 1.0,
+      "strong_wrong_matches": 0,
+      "reference": "Approximate fixture car boxes projected using capture camera pose; asynchronous evaluation reference only, never controller input"
+    },
+    "learned_reid_cpu_graph_nodes": 0,
+    "selective_yocto_build_and_quality_checks_passed": true,
+    "native_sanitizers_passed": true,
+    "failure_cleanup_landed_and_disarmed": true,
+    "normal_board_services_restored": true,
+    "temporary_m7_parameters_restored": true,
+    "multi_run_reliability_qualified": false
   }
 }

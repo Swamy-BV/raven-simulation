@@ -198,16 +198,17 @@ void Video::Receive(const std::string& bytes) noexcept {
       ++rejected_;
       return;
     }
-    frame_log_ << nlohmann::json{{"index", frames_.load()},
-                                 {"pts_ns", pts},
-                                 {"source_sim_ns", image.GetTimestamp()},
-                                 {"capture_ns", capture_ns},
-                                 {"receive_steady_ns", received},
-                                 {"queued_bytes",
-                                  gst_app_src_get_current_level_bytes(
-                                      GST_APP_SRC(source_))}}
-                      .dump()
-               << '\n';
+    frame_log_
+        << nlohmann::json{{"index", frames_.load()},
+                          {"pts_ns", pts},
+                          {"source_sim_ns", image.GetTimestamp()},
+                          {"capture_ns", capture_ns},
+                          {"render_camera_pose", image.GetPositionData()},
+                          {"receive_steady_ns", received},
+                          {"queued_bytes", gst_app_src_get_current_level_bytes(
+                                               GST_APP_SRC(source_))}}
+               .dump()
+        << '\n';
     if (!frame_log_) {
       throw std::runtime_error("Frame log failed");
     }

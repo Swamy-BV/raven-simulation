@@ -63,6 +63,9 @@ class HitlTests(unittest.TestCase):
         minimum_speed_mps = float(os.environ.get("RAVEN_HITL_CRUISE_MPS", "3.5"))
         self.assertTrue(2 <= height_m <= 12)
         self.assertTrue(0 < minimum_speed_mps < 30)
+        reticle_x = float(os.environ.get("RAVEN_HITL_RETICLE_X", "320"))
+        reticle_y = float(os.environ.get("RAVEN_HITL_RETICLE_Y", "135"))
+        self.assertTrue(0 <= reticle_x <= 640 and 0 <= reticle_y <= 360)
         selected = None
         follow_ready_ros_ns = None
         follow_start_ros_ns = None
@@ -256,9 +259,11 @@ class HitlTests(unittest.TestCase):
                     and d.results[0].hypothesis.score > .75
                     and 230 < d.bbox.center.position.x < 410
                     and 60 < d.bbox.center.position.y < 300]
-            # The acquisition reticle selects the foreground vehicle rather than a
-            # smaller parked car whose detector confidence happens to be higher.
-            return max(cars, key=lambda d: d.bbox.size_x * d.bbox.size_y) if cars else None
+            # Select from image geometry at the acquisition reticle. Choosing
+            # the largest box can select a clipped rear escort in dense traffic.
+            return min(cars, key=lambda d: math.hypot(
+                d.bbox.center.position.x - reticle_x,
+                d.bbox.center.position.y - reticle_y)) if cars else None
 
         try:
             wait(lambda: fresh() and latest["position"].xy_valid
@@ -420,6 +425,7 @@ class HitlTests(unittest.TestCase):
                         print("FOLLOW" if start is not None else "WARMUP", json.dumps(sample), flush=True)
                         last_report = time.monotonic()
                 follow_end_ros_ns = node.get_clock().now().nanoseconds
+                print("RECORDING_END", follow_end_ros_ns, flush=True)
                 fraction = sum(s["health"].get("state") == "following"
                                for s in follow_records) / len(follow_records)
                 self.assertGreater(fraction, .9, "sustained following fraction")
