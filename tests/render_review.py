@@ -286,6 +286,8 @@ def main():
                    else "PX4 SITL | Linux vision | ROS 2 | AirSim")
         text(context, 15, 35, details, size=8.5)
         state_label = state["health"].get("state", "unknown") if state else "unknown"
+        if state and state["health"].get("target_control_basis") == "bounded_prediction":
+            state_label = "predicting"
         context.set_source_rgba(0, 0, 0, .62)
         context.rectangle(527, 8, 105, 24)
         context.fill()

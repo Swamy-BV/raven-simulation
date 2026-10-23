@@ -215,6 +215,18 @@ class HitlTests(unittest.TestCase):
             return all(k in latest and time.monotonic() - seen[k] < 2
                        for k in ("status", "position", "land"))
 
+        def tracking_features_ready():
+            message = latest.get("tracking_health")
+            if message is None or not message.status or time.monotonic() - seen["tracking_health"] > .5:
+                return False
+            values = {value.key: value.value for value in message.status[0].values}
+            reid = os.environ.get("RAVEN_HITL_REQUIRE_REID") != "1" or (
+                values.get("vehicle_reid_backend") == "neutron"
+                and values.get("vehicle_reid_cpu_nodes") == "0")
+            ground = os.environ.get("RAVEN_HITL_REQUIRE_GROUND") != "1" or (
+                values.get("ground_association") == "pose-aligned")
+            return reid and ground
+
         def command(number, values=()):
             message = VehicleCommand()
             message.timestamp = stamp()
@@ -284,6 +296,10 @@ class HitlTests(unittest.TestCase):
                      - latest["tracks"].header.stamp.sec
                      - latest["tracks"].header.stamp.nanosec / 1e9 < .3,
                      15, "fresh real-time inference output before arming")
+                if (os.environ.get("RAVEN_HITL_REQUIRE_REID") == "1"
+                        or os.environ.get("RAVEN_HITL_REQUIRE_GROUND") == "1"):
+                    wait(tracking_features_ready, 10,
+                         "configured NPU ReID and ground association active before arming")
                 wait(lambda: health().get("px4_namespace") == "", 5,
                      "guidance addresses the real M7 namespace")
             if yaw_response:
@@ -401,6 +417,11 @@ class HitlTests(unittest.TestCase):
                     h = health()
                     self.assertEqual(h.get("selected_track"), selected)
                     self.assertNotIn(h.get("state"), ("holding", "unavailable"), h)
+                    if h.get("target_control_basis") == "bounded_prediction":
+                        self.assertLessEqual(float(h["source_age_ms"]) / 1000,
+                                             float(h["target_prediction_horizon_s"]) + .001)
+                        self.assertLessEqual(float(h["target_prediction_stddev_m"]),
+                                             float(h["target_prediction_limit_m"]) + .000001)
                     p = latest["position"]
                     sample = {"ros_ns": node.get_clock().now().nanoseconds,
                               "ned": [p.x, p.y, p.z],

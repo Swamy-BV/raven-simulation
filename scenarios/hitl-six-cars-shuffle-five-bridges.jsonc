@@ -60,7 +60,9 @@
     "max_target_range": 80.0,
     "follow_path": true,
     "heading_response_seconds": 1.0,
-    "target_loss_timeout": 3.0
+    "target_loss_timeout": 3.0,
+    "target_prediction_seconds": 1.0,
+    "target_prediction_stddev": 2.0
   },
   "camera": {
     "pitch_down_deg": 25.0,

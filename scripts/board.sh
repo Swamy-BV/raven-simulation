@@ -19,6 +19,12 @@ guidance_config=${RAVEN_SIM_GUIDANCE_CONFIG:-}
 vision_model=${RAVEN_SIM_VISION_MODEL:-}
 vision_binary=${RAVEN_SIM_VISION_BINARY:-}
 vision_config=${RAVEN_SIM_VISION_CONFIG:-}
+tracker_binary=${RAVEN_SIM_TRACKER_BINARY:-}
+reid_model=${RAVEN_SIM_REID_MODEL:-}
+library_path=${RAVEN_SIM_LIBRARY_PATH:-}
+[[ -z "$library_path" || "$library_path" =~ ^/[-/A-Za-z0-9_.]+(:/[-/A-Za-z0-9_.]+)*$ ]] || { echo 'Expected absolute runtime library paths' >&2; exit 2; }
+tracking_binary=0
+tracking_model=0
 vision_override=0
 tracking_profile=0
 [[ "$vision_model" =~ ^[A-Za-z0-9_-]*$ ]] || { echo "Invalid model identifier" >&2; exit 2; }
@@ -39,6 +45,10 @@ if [ "$mode" = start ]; then
   if [ -n "${RAVEN_SIM_GUIDANCE_UNIT:-}" ]; then
     ssh "${ssh_args[@]}" root@"$board" 'cat > /run/systemd/system/guidance.service; systemctl daemon-reload' < "$RAVEN_SIM_GUIDANCE_UNIT"
   fi
+  if [ -n "${RAVEN_SIM_TRACKER_UNIT:-}" ]; then
+    test -r "$RAVEN_SIM_TRACKER_UNIT"
+    ssh "${ssh_args[@]}" root@"$board" 'cat > /run/systemd/system/target-tracker.service; systemctl daemon-reload; systemctl reset-failed target-tracker.service' < "$RAVEN_SIM_TRACKER_UNIT"
+  fi
   if [ -n "$guidance_config" ]; then
     test -r "$guidance_config"
     ssh "${ssh_args[@]}" root@"$board" 'mkdir -p /run/raven-simulation; cat > /run/raven-simulation/guidance.yaml' < "$guidance_config"
@@ -50,6 +60,16 @@ if [ "$mode" = start ]; then
     ssh "${ssh_args[@]}" root@"$board" 'mkdir -p /run/raven-simulation; systemctl stop vision-engine; cat > /run/raven-simulation/vision-engine; chmod 0755 /run/raven-simulation/vision-engine' < "$vision_binary"
     ssh "${ssh_args[@]}" root@"$board" 'cat > /run/raven-simulation/vision.json' < "$vision_config"
     vision_override=1
+  fi
+  if [ -n "$tracker_binary" ]; then
+    test -r "$tracker_binary"
+    ssh "${ssh_args[@]}" root@"$board" 'mkdir -p /run/raven-simulation; systemctl stop target-tracker; cat > /run/raven-simulation/target-tracker; chmod 0755 /run/raven-simulation/target-tracker' < "$tracker_binary"
+    tracking_binary=1
+  fi
+  if [ -n "$reid_model" ]; then
+    test -r "$reid_model"
+    ssh "${ssh_args[@]}" root@"$board" 'mkdir -p /run/raven-simulation; cat > /run/raven-simulation/vehicle-reid.tflite' < "$reid_model"
+    tracking_model=1
   fi
   camera="$root/config/camera.yaml"
   if [ -n "$scenario_config" ]; then
@@ -70,7 +90,7 @@ if [ "$mode" = start ]; then
     binary=1
   fi
 fi
-ssh "${ssh_args[@]}" root@"$board" /bin/sh -s -- "$mode" "$trace" "$profile" "$binary" "$config" "${vision_model:--}" "$controller" "$vision_override" "$tracking_profile" <<'REMOTE'
+ssh "${ssh_args[@]}" root@"$board" /bin/sh -s -- "$mode" "$trace" "$profile" "$binary" "$config" "${vision_model:--}" "$controller" "$vision_override" "$tracking_profile" "$library_path" "$tracking_binary" "$tracking_model" <<'REMOTE'
 set -e
 mode=$1
 trace=$2
@@ -82,6 +102,9 @@ vision_model=$6
 controller=$7
 vision_override=$8
 tracking_profile=$9
+library_path=${10}
+tracking_binary=${11}
+tracking_model=${12}
 sim_time=true
 [ "$controller" = hitl ] && sim_time=false
 if systemctl cat guidance >/dev/null 2>&1; then systemctl stop guidance; fi
@@ -98,6 +121,9 @@ for service in media-capture vision-engine target-tracker guidance; do
 ExecStart=
 ExecStart=/opt/ros/jazzy/lib/$package/$service --ros-args --params-file /etc/$service.yaml -p use_sim_time:=$sim_time
 CONF
+  if [ -n "$library_path" ] && { [ "$service" = vision-engine ] || [ "$service" = target-tracker ]; }; then
+    printf 'Environment=LD_LIBRARY_PATH=%s:/opt/ros/jazzy/lib\n' "$library_path" >> "$override"
+  fi
   if [ "$trace" = 1 ]; then
     case "$service" in
       media-capture) logger=raven.vehicle_1.cameras.front.media_capture ;;
@@ -120,8 +146,16 @@ RuntimeDirectoryMode=0700
 ReadWritePaths=/run/vision-engine-validation
 CONF
     fi
-  elif [ "$service" = target-tracker ] && [ "$tracking_profile" = 1 ]; then
-    sed -i '/^ExecStart=./s|$| --params-file /run/raven-simulation/tracking.yaml|' "$override"
+  elif [ "$service" = target-tracker ]; then
+    if [ "$tracking_binary" = 1 ]; then
+      sed -i 's|^ExecStart=/opt/ros/jazzy/lib/target_tracker/target-tracker |ExecStart=/run/raven-simulation/target-tracker |' "$override"
+    fi
+    if [ "$tracking_profile" = 1 ]; then
+      sed -i '/^ExecStart=./s|$| --params-file /run/raven-simulation/tracking.yaml|' "$override"
+    fi
+    if [ "$tracking_model" = 1 ]; then
+      sed -i '/^ExecStart=./s|$| -p vehicle_reid_model:=/run/raven-simulation/vehicle-reid.tflite|' "$override"
+    fi
   elif [ "$service" = guidance ]; then
     if [ "$config" = 1 ]; then
       sed -i 's|/etc/guidance.yaml|/run/raven-simulation/guidance.yaml|' "$override"
@@ -161,7 +195,7 @@ else
   rm -f /run/systemd/system/px4-simulation-agent.service
 fi
 if [ "$mode" = stop ]; then
-  rm -f /run/systemd/system/guidance.service
+  rm -f /run/systemd/system/guidance.service /run/systemd/system/target-tracker.service
 fi
 systemctl daemon-reload
 systemctl restart media-capture vision-engine target-tracker
