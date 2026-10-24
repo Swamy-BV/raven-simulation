@@ -26,7 +26,7 @@ class HitlTests(unittest.TestCase):
         from px4_msgs.msg import (VehicleStatus, VehicleLocalPosition,
                                   VehicleLandDetected, VehicleCommandAck,
                                   VehicleCommand, OffboardControlMode, TrajectorySetpoint, VehicleAttitude,
-                                  VehicleOdometry)
+                                  VehicleOdometry, EstimatorStatusFlags)
 
         from diagnostic_msgs.msg import DiagnosticArray
         from vision_msgs.msg import Detection2DArray
@@ -36,6 +36,7 @@ class HitlTests(unittest.TestCase):
 
         rclpy.init()
         node = rclpy.create_node("m7_hitl_hover_acceptance")
+        require_ev = os.environ.get("RAVEN_HITL_REQUIRE_EV") == "1"
         latest = {}
         seen = {}
         records = []
@@ -43,6 +44,7 @@ class HitlTests(unittest.TestCase):
         subs = []
         output = Path("/tmp/raven-hitl-results") / time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         output.mkdir(parents=True, exist_ok=False)
+        fusion_log = (output / "fusion.jsonl").open("w")
         track_log = (output / "tracks.jsonl").open("w")
         detection_log = (output / "detections.jsonl").open("w")
         health_log = (output / "health.jsonl").open("w")
@@ -76,6 +78,12 @@ class HitlTests(unittest.TestCase):
         reset = node.create_client(Trigger, "/raven/vehicle_1/perception/reset_tracking")
 
         def receive(key, message):
+            if key == "fusion":
+                fusion_log.write(json.dumps({
+                    "received_ros_ns": node.get_clock().now().nanoseconds,
+                    "source_us": message.timestamp,
+                    "ev_pos": message.cs_ev_pos, "gnss_pos": message.cs_gnss_pos,
+                    "gnss_vel": message.cs_gnss_vel, "gps_hgt": message.cs_gps_hgt}) + "\n")
             latest[key] = message
             seen[key] = time.monotonic()
             if key == "setpoint":
@@ -140,6 +148,10 @@ class HitlTests(unittest.TestCase):
             subs.append(node.create_subscription(
                 cls, "/fmu/out/" + topic,
                 lambda m, key=key: receive(key, m), qos_profile_sensor_data))
+        if require_ev:
+            subs.append(node.create_subscription(
+                EstimatorStatusFlags, "/fmu/out/estimator_status_flags",
+                lambda m: receive("fusion", m), qos_profile_sensor_data))
         if yaw_response:
             subs.append(node.create_subscription(
                 VehicleOdometry, "/fmu/out/vehicle_odometry",
@@ -227,6 +239,13 @@ class HitlTests(unittest.TestCase):
                 values.get("ground_association") == "pose-aligned")
             return reid and ground
 
+        # PX4 publishes unchanged fusion status at 1 Hz, immediately on changes.
+        def external_vision_active():
+            flags = latest.get("fusion")
+            return (flags is not None and time.monotonic() - seen["fusion"] < 2
+                    and flags.cs_ev_pos and not flags.cs_gnss_pos
+                    and not flags.cs_gnss_vel and not flags.cs_gps_hgt)
+
         def command(number, values=()):
             message = VehicleCommand()
             message.timestamp = stamp()
@@ -282,6 +301,9 @@ class HitlTests(unittest.TestCase):
         try:
             wait(lambda: fresh() and latest["position"].xy_valid
                  and latest["position"].z_valid, 45, "fresh M7 estimator and land telemetry")
+            if require_ev:
+                wait(external_vision_active, 30,
+                     "M7 external vision fused with GPS position/velocity/height aiding off")
             if following:
                 for name in (guidance, "/raven/vehicle_1/perception/vision_engine",
                              "/raven/vehicle_1/perception/target_tracker",
@@ -339,6 +361,8 @@ class HitlTests(unittest.TestCase):
                 self.assertEqual(status.hil_state, VehicleStatus.HIL_STATE_ON)
                 self.assertEqual(status.nav_state, VehicleStatus.NAVIGATION_STATE_OFFBOARD)
                 self.assertFalse(status.failsafe)
+                if require_ev:
+                    self.assertTrue(external_vision_active(), "GPS-denied external vision stopped")
                 p = latest["position"]
                 maximum_error = max(maximum_error, math.dist(goal, [p.x, p.y, p.z]))
                 self.assertLess(maximum_error, .75, "hover position error")
@@ -478,6 +502,7 @@ class HitlTests(unittest.TestCase):
                       "command_transport": "ROS DDS over RPMsg", "hover_seconds": 10,
                       "height_m": height_m, "minimum_target_speed_mps": minimum_speed_mps, "maximum_hover_error_m": maximum_error,
                       "normal_arming": True, "landed": True, "disarmed": True,
+                      "external_vision_required": require_ev,
                       "hover_start_ros_ns": hover_start_ros_ns,
                       "hover_end_ros_ns": hover_end_ros_ns,
                       "origin_ned": origin,
@@ -512,6 +537,7 @@ class HitlTests(unittest.TestCase):
                     print("CLEANUP FAILED", str(error), flush=True)
             (output / "following.json").write_text(json.dumps(follow_records) + "\n")
             (output / "positions.json").write_text(json.dumps(records) + "\n")
+            fusion_log.close()
             track_log.close()
             detection_log.close()
             health_log.close()

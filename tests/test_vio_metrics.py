@@ -55,6 +55,12 @@ class DriftMetricsTest(unittest.TestCase):
         self.assertAlmostEqual(result["odometry_time_coverage_fraction"], 0.2)
         self.assertAlmostEqual(result["unobserved_reference_tail_seconds"], 0.8)
 
+    def test_unrelated_diagnostic_rows_do_not_change_drift(self):
+        rows = self.samples()
+        rows.append({"kind": "adapter_health", "reason": "fresh"})
+        result, _ = compare(rows)
+        self.assertLess(result["position_rmse_m"], 1e-12)
+
     def test_no_odometry_is_not_comparable(self):
         result, _ = compare([r for r in self.samples() if r["kind"] != "odometry"])
         self.assertFalse(result["comparable"])

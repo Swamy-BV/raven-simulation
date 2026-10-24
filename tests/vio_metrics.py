@@ -86,7 +86,7 @@ def compare(rows):
     result["route_complete"] = any(r["name"] == "route_complete" for r in events)
     result["landed_and_disarmed"] = any(r["name"] == "landed_and_disarmed" for r in events)
     result["failures"] = [r for r in events if r["name"] == "failure"]
-    receive_start = min(r["receive_monotonic_ns"] for r in rows)
+    receive_start = min(r["receive_monotonic_ns"] for r in rows if "receive_monotonic_ns" in r)
     result["initialization_wall_seconds"] = (odometry[0]["receive_monotonic_ns"]-receive_start)/1e9
     return result, {"time_s": times, "reference": reference, "vio": aligned, "error_m": errors}
 

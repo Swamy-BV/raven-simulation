@@ -63,7 +63,7 @@ def run(args):
     error = None
     try:
         spin_for(observer, 5)
-        for required in ("image", "imu", "truth"):
+        for required in ("image", "imu", "truth", "odometry"):
             if observer.counts.get(required, 0) < 10:
                 raise RuntimeError(f"Insufficient {required} samples before evaluation")
         if observer.invalid_stamps or observer.regressions:

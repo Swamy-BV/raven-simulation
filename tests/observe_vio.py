@@ -5,6 +5,8 @@ import json
 import time
 from pathlib import Path
 
+from diagnostic_msgs.msg import DiagnosticArray
+from px4_msgs.msg import VehicleOdometry
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
@@ -48,7 +50,9 @@ class VioObserver(Node):
             self.create_subscription(Imu, self.topics["imu"], self.imu, sensor_history),
             self.create_subscription(PoseStamped, self.topics["truth"], self.truth, sensor_history),
             self.create_subscription(Odometry, self.topics["odometry"], self.odometry, sensor_history),
-            self.create_subscription(CameraInfo, self.topics["image"] + "/camera_info", self.info, qos_profile_sensor_data)]
+            self.create_subscription(CameraInfo, self.topics["image"] + "/camera_info", self.info, qos_profile_sensor_data),
+            self.create_subscription(DiagnosticArray, "/localization/px4/health", self.adapter_health, 1),
+            self.create_subscription(VehicleOdometry, "/fmu/in/vehicle_visual_odometry", self.adapter_output, qos_profile_sensor_data)]
 
     def record(self, kind, message, fields):
         stamp = stamp_ns(message)
@@ -101,6 +105,18 @@ class VioObserver(Node):
                          message.twist.twist.linear.z],
             "pose_covariance": list(message.pose.covariance),
             "latest_imu_ns": self.last_imu, "latest_image_ns": self.last_image})
+
+    def adapter_health(self, message):
+        if message.status:
+            status = message.status[0]
+            self.records.write(json.dumps({"kind": "adapter_health", "stamp_ns": stamp_ns(message),
+                "receive_monotonic_ns": time.monotonic_ns(),
+                "reason": status.message, "values": {v.key:v.value for v in status.values}}) + "\n")
+
+    def adapter_output(self, message):
+        self.records.write(json.dumps({"kind": "px4_input", "stamp_ns": message.timestamp_sample*1000,
+            "receive_monotonic_ns": time.monotonic_ns(), "reset_counter": int(message.reset_counter),
+            "position": [float(v) for v in message.position], "quality": int(message.quality)}) + "\n")
 
     def info(self, message):
         self.camera_info = {"width": message.width, "height": message.height,

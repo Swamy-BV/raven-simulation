@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Prepare a fixed-camera, SimpleFlight-only VIO evaluation from upstream templates."""
+"""Prepare fixed-camera VIO evaluation from upstream simulator templates; never arm."""
 import argparse
 import json
+import ipaddress
 import math
 from pathlib import Path
 
@@ -27,7 +28,7 @@ def write_yaml(path, value):
         value, Dumper=NoAliases, sort_keys=False, default_flow_style=None))
 
 
-def prepare(profile, robot, estimator, output):
+def prepare(profile, robot, estimator, output, hitl_board=None):
     camera = profile["camera"]
     imu = profile["imu"]
     width, height = camera["width"], camera["height"]
@@ -37,8 +38,23 @@ def prepare(profile, robot, estimator, output):
         raise ValueError("Navigation camera rate must be 5..60 Hz")
     if not 0 < profile["physics_step_ns"] <= 10000000:
         raise ValueError("Physics step must be positive and at most 10 ms")
-    if robot["controller"]["type"] != "simple-flight-api":
-        raise ValueError("VIO shadow evaluation requires the simulator's internal controller")
+    expected = "px4-api" if hitl_board else "simple-flight-api"
+    if robot["controller"]["type"] != expected:
+        raise ValueError(f"Expected an upstream {expected} robot template")
+    auxiliary = []
+    if hitl_board:
+        ipaddress.IPv4Address(hitl_board)
+        auxiliary = [sensor for sensor in robot["sensors"]
+                     if sensor["type"] not in ("camera", "imu")]
+        settings = robot["controller"]["px4-settings"]
+        settings.update({"use-serial": False, "use-tcp": True,
+                         "local-host-ip": "0.0.0.0", "lock-step": False,
+                         "tcp-port": 4560, "control-ip-address": hitl_board,
+                         "control-port": 14581, "control-port-remote": 14581,
+                         "control-port-local": 14580,
+                         "hil-gps-update-rate-hz": 10.0, "parameters": {}})
+        for key in ("serial-port", "qgc-host-ip", "qgc-port"):
+            settings.pop(key, None)
     output.mkdir(parents=True, exist_ok=False)
     capture = {"image-type": 0, "width": width, "height": height,
                "fov-degrees": camera["horizontal_fov_deg"],
@@ -57,6 +73,7 @@ def prepare(profile, robot, estimator, output):
          "gyroscope": {"angle-random-walk": imu["gyroscope_noise_density"],
                        "bias-stability": imu["gyroscope_bias_stability"],
                        "tau": imu["gyroscope_tau_s"], "turn-on-bias": "0 0 0"}}]
+    robot["sensors"].extend(auxiliary)
     scene = {"id": profile["id"], "scene-type": "UnrealNative",
              "actors": [{"type": "robot", "name": profile["robot"],
                          "origin": {"xyz": " ".join(map(str, profile["origin_ned_m"])),
@@ -82,6 +99,7 @@ def prepare(profile, robot, estimator, output):
                               "intrinsics": [focal, focal, width / 2, height / 2],
                               "resolution": [width, height], "rostopic": topics["image"]}}
     identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    # The pinned AirSim IMU topic publishes at 100 Hz; physics/HIL runs at 250 Hz.
     imu_chain = {"imu0": {"T_i_b": [[1., 0., 0., 0.], [0., 1., 0., 0.],
                                     [0., 0., 1., 0.], [0., 0., 0., 1.]],
                           "accelerometer_noise_density": imu["accelerometer_noise_density"],
@@ -89,11 +107,14 @@ def prepare(profile, robot, estimator, output):
                           "gyroscope_noise_density": imu["gyroscope_noise_density"],
                           "gyroscope_random_walk": imu["gyroscope_bias_stability"] / math.sqrt(imu["gyroscope_tau_s"]),
                           "rostopic": topics["imu"], "time_offset": 0.0,
-                          "update_rate": 1e9 / profile["physics_step_ns"], "model": "kalibr",
+                          "update_rate": 100.0, "model": "kalibr",
                           "Tw": identity, "Ta": identity, "R_IMUtoGYRO": identity,
                           "R_IMUtoACC": identity, "Tg": [[0.0] * 3 for _ in range(3)]}}
     estimator.update({"max_cameras": 1, "use_stereo": False, "use_aruco": False,
-                      "try_zupt": True, "zupt_only_at_beginning": True,
+                      "try_zupt": True, "init_imu_thresh": 0.15,
+                      "max_slam": 10, "max_clones": 8, "num_pts": 100, "enable_feature_cloud": False,
+                      "multi_threading_pubs": False, "multi_threading_subs": False,
+                      "zupt_only_at_beginning": False,
                       "zupt_chi2_multipler": 0.5, "zupt_noise_multiplier": 1.0,
                       "zupt_max_disparity": 0.1,
                       "calib_cam_extrinsics": False, "calib_cam_intrinsics": False,
@@ -118,10 +139,11 @@ def main():
     parser.add_argument("--robot-template", type=Path, required=True)
     parser.add_argument("--estimator-template", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--hitl-board", help="Generate native M7 HITL transport; does not arm or change board parameters")
     args = parser.parse_args()
     robot = commentjson.loads(args.robot_template.read_text())
     estimator = yaml.safe_load(args.estimator_template.read_text().replace("%YAML:1.0", ""))
-    topics = prepare(json.loads(args.profile.read_text()), robot, estimator, args.output)
+    topics = prepare(json.loads(args.profile.read_text()), robot, estimator, args.output, args.hitl_board)
     print(json.dumps(topics, indent=2))
 
 

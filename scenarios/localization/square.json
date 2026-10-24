@@ -7,7 +7,7 @@
     "id": "Navigation",
     "width": 640,
     "height": 480,
-    "rate_hz": 25,
+    "rate_hz": 20,
     "horizontal_fov_deg": 90.0,
     "pitch_down_deg": 20.0,
     "position_frd_m": [0.3, 0.0, 0.0]
