@@ -1,0 +1,1218 @@
+{
+  "schema_version": 1,
+  "scene_id": "M7HitlCityCyclistGroup",
+  "aircraft": {
+    "name": "CameraDrone",
+    "xyz": "592.928932188 -287.071067812 -1.2",
+    "rpy_deg": "0 0 45"
+  },
+  "target": {
+    "name": "TargetCyclist",
+    "asset": "Cyclist",
+    "display_name": "CyclistVisual",
+    "visual_yaw_offset_deg": -90,
+    "height_ned_m": -1.95041621,
+    "mesh_file": "cyclist-silver-demo.glb",
+    "credit": "Cyclist model: restore50 | CC BY 4.0",
+    "source": "https://sketchfab.com/3d-models/cyclist-on-a-silver-bicycle-9830d3f8cac84547aa33542c6141178c"
+  },
+  "route": {
+    "type": "segments",
+    "start_xy_m": [
+      600,
+      -280
+    ],
+    "start_heading_deg": 90,
+    "segments": [
+      {
+        "type": "line",
+        "length_m": 400
+      },
+      {
+        "type": "arc",
+        "radius_m": 80,
+        "turn_deg": -25
+      },
+      {
+        "type": "arc",
+        "radius_m": 80,
+        "turn_deg": 25
+      },
+      {
+        "type": "arc",
+        "radius_m": 80,
+        "turn_deg": 25
+      },
+      {
+        "type": "arc",
+        "radius_m": 80,
+        "turn_deg": -25
+      },
+      {
+        "type": "line",
+        "length_m": 114.76215624297618
+      },
+      {
+        "type": "bezier",
+        "control1_xy_m": [
+          600,
+          400
+        ],
+        "control2_xy_m": [
+          632,
+          400
+        ],
+        "end_xy_m": [
+          632,
+          430
+        ]
+      },
+      {
+        "type": "arc",
+        "radius_m": 32,
+        "turn_deg": 270
+      },
+      {
+        "type": "bezier",
+        "control1_xy_m": [
+          618,
+          398
+        ],
+        "control2_xy_m": [
+          618,
+          380
+        ],
+        "end_xy_m": [
+          618,
+          360
+        ]
+      },
+      {
+        "type": "line",
+        "length_m": 40
+      },
+      {
+        "type": "arc",
+        "radius_m": 60,
+        "turn_deg": 90
+      },
+      {
+        "type": "line",
+        "length_m": 40
+      },
+      {
+        "type": "arc",
+        "radius_m": 65,
+        "turn_deg": -25
+      },
+      {
+        "type": "arc",
+        "radius_m": 65,
+        "turn_deg": 25
+      },
+      {
+        "type": "arc",
+        "radius_m": 65,
+        "turn_deg": 25
+      },
+      {
+        "type": "arc",
+        "radius_m": 65,
+        "turn_deg": -25
+      },
+      {
+        "type": "line",
+        "length_m": 50.11925194741815
+      },
+      {
+        "type": "bezier",
+        "control1_xy_m": [
+          908,
+          260
+        ],
+        "control2_xy_m": [
+          908,
+          228
+        ],
+        "end_xy_m": [
+          938,
+          228
+        ]
+      },
+      {
+        "type": "arc",
+        "radius_m": 32,
+        "turn_deg": 270
+      },
+      {
+        "type": "bezier",
+        "control1_xy_m": [
+          906,
+          242
+        ],
+        "control2_xy_m": [
+          888,
+          242
+        ],
+        "end_xy_m": [
+          868,
+          242
+        ]
+      },
+      {
+        "type": "line",
+        "length_m": 80
+      },
+      {
+        "type": "arc",
+        "radius_m": 45,
+        "turn_deg": 180
+      },
+      {
+        "type": "bezier",
+        "control1_xy_m": [
+          1100,
+          152
+        ],
+        "control2_xy_m": [
+          1100,
+          -500
+        ],
+        "end_xy_m": [
+          900,
+          -500
+        ]
+      },
+      {
+        "type": "bezier",
+        "control1_xy_m": [
+          600,
+          -500
+        ],
+        "control2_xy_m": [
+          600,
+          -400
+        ],
+        "end_xy_m": [
+          600,
+          -280
+        ]
+      }
+    ]
+  },
+  "target_speed_mps": 5.5,
+  "target_start_delay_s": 5,
+  "target_start_on_ready": true,
+  "following_parameters": {
+    "ground_z": 0.2,
+    "target_position_stddev": 0.5,
+    "target_acceleration_noise": 3.0,
+    "align_with_motion": true,
+    "motion_bearing_offset": -0.6981317007977318,
+    "minimum_heading_speed": 1.0,
+    "follow_distance": 10.0,
+    "position_gain": 0.4,
+    "max_speed": 8.0,
+    "max_acceleration": 3.0,
+    "max_jerk": 3.0,
+    "max_yaw_rate": 1.0,
+    "max_displacement": 1200.0,
+    "max_target_range": 80.0,
+    "follow_path": false,
+    "heading_response_seconds": 0.4,
+    "target_loss_timeout": 3.0,
+    "target_prediction_seconds": 1.0,
+    "target_prediction_stddev": 2.0
+  },
+  "camera": {
+    "pitch_down_deg": 22.0,
+    "horizontal_fov_deg": 55.0,
+    "stabilized": true,
+    "render_width": 1280,
+    "capture_rate_hz": 60
+  },
+  "vehicle_acceleration_mps2": 1.0,
+  "vehicle_lateral_acceleration_mps2": 1.5,
+  "flight_controller": "hitl",
+  "route_laps": 3,
+  "traffic_start_on_ready": true,
+  "traffic": [
+    {
+      "name": "TrafficCar1",
+      "display_name": "TrafficSedan1",
+      "phase_fraction": 0.04570122822050843,
+      "speed_mps": 13.0,
+      "route_inset_m": -4,
+      "stop_after_m": 280,
+      "asset": "Car_01",
+      "mesh_file": null,
+      "height_ned_m": -1.03,
+      "visual_yaw_offset_deg": -90
+    },
+    {
+      "name": "TrafficCar3",
+      "display_name": "TrafficSedan3",
+      "phase_fraction": 0.07426449585832619,
+      "speed_mps": 13.0,
+      "route_inset_m": -4,
+      "stop_after_m": 280,
+      "asset": "Car_01",
+      "mesh_file": null,
+      "height_ned_m": -1.03,
+      "visual_yaw_offset_deg": -90
+    },
+    {
+      "name": "CrossingCar1",
+      "display_name": "CrossingSedan1",
+      "route": {
+        "type": "segments",
+        "start_xy_m": [
+          480,
+          70
+        ],
+        "start_heading_deg": 0,
+        "segments": [
+          {
+            "type": "line",
+            "length_m": 240
+          },
+          {
+            "type": "arc",
+            "radius_m": 15,
+            "turn_deg": 90
+          },
+          {
+            "type": "line",
+            "length_m": 120
+          },
+          {
+            "type": "arc",
+            "radius_m": 15,
+            "turn_deg": 90
+          },
+          {
+            "type": "line",
+            "length_m": 240
+          },
+          {
+            "type": "arc",
+            "radius_m": 15,
+            "turn_deg": 90
+          },
+          {
+            "type": "line",
+            "length_m": 120
+          },
+          {
+            "type": "arc",
+            "radius_m": 15,
+            "turn_deg": 90
+          }
+        ]
+      },
+      "speed_mps": 8.0,
+      "start_delay_s": 11.0,
+      "stop_after_m": 240,
+      "asset": "Car_01",
+      "mesh_file": null,
+      "height_ned_m": -1.03,
+      "visual_yaw_offset_deg": -90
+    },
+    {
+      "name": "MergingCar1",
+      "display_name": "MergingSedan1",
+      "route": {
+        "type": "segments",
+        "start_xy_m": [
+          620,
+          -260
+        ],
+        "start_heading_deg": 90,
+        "segments": [
+          {
+            "type": "bezier",
+            "control1_xy_m": [
+              620,
+              -235
+            ],
+            "control2_xy_m": [
+              608,
+              -205
+            ],
+            "end_xy_m": [
+              608,
+              -170
+            ]
+          },
+          {
+            "type": "line",
+            "length_m": 220
+          },
+          {
+            "type": "arc",
+            "radius_m": 30,
+            "turn_deg": 180
+          },
+          {
+            "type": "line",
+            "length_m": 220
+          },
+          {
+            "type": "bezier",
+            "control1_xy_m": [
+              548,
+              -210
+            ],
+            "control2_xy_m": [
+              620,
+              -300
+            ],
+            "end_xy_m": [
+              620,
+              -260
+            ]
+          }
+        ]
+      },
+      "speed_mps": 11.5,
+      "start_delay_s": 1,
+      "stop_after_m": 220,
+      "asset": "Car_01",
+      "mesh_file": null,
+      "height_ned_m": -1.03,
+      "visual_yaw_offset_deg": -90
+    },
+    {
+      "name": "CrossingCar3",
+      "display_name": "CrossingSedan3",
+      "route": {
+        "type": "segments",
+        "start_xy_m": [
+          720,
+          66
+        ],
+        "start_heading_deg": 180,
+        "segments": [
+          {
+            "type": "line",
+            "length_m": 240
+          },
+          {
+            "type": "arc",
+            "radius_m": 15,
+            "turn_deg": 90
+          },
+          {
+            "type": "line",
+            "length_m": 120
+          },
+          {
+            "type": "arc",
+            "radius_m": 15,
+            "turn_deg": 90
+          },
+          {
+            "type": "line",
+            "length_m": 240
+          },
+          {
+            "type": "arc",
+            "radius_m": 15,
+            "turn_deg": 90
+          },
+          {
+            "type": "line",
+            "length_m": 120
+          },
+          {
+            "type": "arc",
+            "radius_m": 15,
+            "turn_deg": 90
+          }
+        ]
+      },
+      "speed_mps": 8.0,
+      "start_delay_s": 20,
+      "stop_after_m": 240,
+      "asset": "Car_01",
+      "mesh_file": null,
+      "height_ned_m": -1.03,
+      "visual_yaw_offset_deg": -90
+    },
+    {
+      "name": "GroupCyclist02",
+      "display_name": "GroupCyclistVisual02",
+      "asset": "Cyclist",
+      "mesh_file": "cyclist-silver-demo.glb",
+      "height_ned_m": -1.95041621,
+      "visual_yaw_offset_deg": -90,
+      "route_offset_xy_m": [
+        -2.3,
+        -3.2
+      ],
+      "speed_mps": 5.5,
+      "start_delay_s": 5
+    },
+    {
+      "name": "GroupCyclist03",
+      "display_name": "GroupCyclistVisual03",
+      "asset": "Cyclist",
+      "mesh_file": "cyclist-silver-demo.glb",
+      "height_ned_m": -1.95041621,
+      "visual_yaw_offset_deg": -90,
+      "route_offset_xy_m": [
+        0,
+        -3.2
+      ],
+      "speed_mps": 5.5,
+      "start_delay_s": 5
+    },
+    {
+      "name": "GroupCyclist04",
+      "display_name": "GroupCyclistVisual04",
+      "asset": "Cyclist",
+      "mesh_file": "cyclist-silver-demo.glb",
+      "height_ned_m": -1.95041621,
+      "visual_yaw_offset_deg": -90,
+      "route_offset_xy_m": [
+        2.3,
+        -3.2
+      ],
+      "speed_mps": 5.5,
+      "start_delay_s": 5
+    },
+    {
+      "name": "GroupCyclist05",
+      "display_name": "GroupCyclistVisual05",
+      "asset": "Cyclist",
+      "mesh_file": "cyclist-silver-demo.glb",
+      "height_ned_m": -1.95041621,
+      "visual_yaw_offset_deg": -90,
+      "route_offset_xy_m": [
+        -2.3,
+        0
+      ],
+      "speed_mps": 5.5,
+      "start_delay_s": 5
+    },
+    {
+      "name": "GroupCyclist06",
+      "display_name": "GroupCyclistVisual06",
+      "asset": "Cyclist",
+      "mesh_file": "cyclist-silver-demo.glb",
+      "height_ned_m": -1.95041621,
+      "visual_yaw_offset_deg": -90,
+      "route_offset_xy_m": [
+        2.3,
+        0
+      ],
+      "speed_mps": 5.5,
+      "start_delay_s": 5
+    },
+    {
+      "name": "GroupCyclist07",
+      "display_name": "GroupCyclistVisual07",
+      "asset": "Cyclist",
+      "mesh_file": "cyclist-silver-demo.glb",
+      "height_ned_m": -1.95041621,
+      "visual_yaw_offset_deg": -90,
+      "route_offset_xy_m": [
+        -2.3,
+        3.2
+      ],
+      "speed_mps": 5.5,
+      "start_delay_s": 5
+    },
+    {
+      "name": "GroupCyclist08",
+      "display_name": "GroupCyclistVisual08",
+      "asset": "Cyclist",
+      "mesh_file": "cyclist-silver-demo.glb",
+      "height_ned_m": -1.95041621,
+      "visual_yaw_offset_deg": -90,
+      "route_offset_xy_m": [
+        0,
+        3.2
+      ],
+      "speed_mps": 5.5,
+      "start_delay_s": 5
+    },
+    {
+      "name": "GroupCyclist09",
+      "display_name": "GroupCyclistVisual09",
+      "asset": "Cyclist",
+      "mesh_file": "cyclist-silver-demo.glb",
+      "height_ned_m": -1.95041621,
+      "visual_yaw_offset_deg": -90,
+      "route_offset_xy_m": [
+        2.3,
+        3.2
+      ],
+      "speed_mps": 5.5,
+      "start_delay_s": 5
+    },
+    {
+      "name": "GroupCyclist10",
+      "display_name": "GroupCyclistVisual10",
+      "asset": "Cyclist",
+      "mesh_file": "cyclist-silver-demo.glb",
+      "height_ned_m": -1.95041621,
+      "visual_yaw_offset_deg": -90,
+      "route_offset_xy_m": [
+        0,
+        6.4
+      ],
+      "speed_mps": 5.5,
+      "start_delay_s": 5
+    }
+  ],
+  "px4_parameters": {
+    "MPC_XY_VEL_MAX": 10.0,
+    "MPC_XY_CRUISE": 8.0,
+    "MPC_ACC_HOR": 3.0,
+    "MPC_ACC_HOR_MAX": 5.0,
+    "MPC_TILTMAX_AIR": 45.0,
+    "MPC_YAWRAUTO_MAX": 60.0
+  },
+  "acceptance": {
+    "height_m": 4.5,
+    "minimum_target_speed_mps": 4.5,
+    "following_seconds": 180,
+    "target_class_id": 1,
+    "acquisition_reticle": [
+      320,
+      220
+    ]
+  },
+  "vision_parameters": {
+    "model": "yolov8s-neutron"
+  },
+  "course": {
+    "type": "continuous",
+    "surface_z_m": -1.0,
+    "road_width_m": 20,
+    "grass_texture": "aerial_grass_rock",
+    "asphalt_texture": "asphalt_02",
+    "tree_asset": "Tree_01",
+    "small_house_asset": "Small_House_Prefab_01",
+    "house_asset": "Medium_House_Prefab_01",
+    "centerline": false,
+    "lane_markings_m": [
+      -6,
+      -2,
+      2,
+      6
+    ],
+    "building_offset_m": 42,
+    "trees": {
+      "spacing_m": 32,
+      "offset_m": 20,
+      "scale": 0.6
+    },
+    "roundabouts": [
+      {
+        "center_xy_m": [
+          600,
+          430
+        ],
+        "radius_m": 32
+      },
+      {
+        "center_xy_m": [
+          938,
+          260
+        ],
+        "radius_m": 32
+      }
+    ],
+    "crossroads": [
+      {
+        "start_xy_m": [
+          480,
+          70
+        ],
+        "end_xy_m": [
+          720,
+          70
+        ],
+        "width_m": 12
+      },
+      {
+        "start_xy_m": [
+          800,
+          140
+        ],
+        "end_xy_m": [
+          800,
+          380
+        ],
+        "width_m": 14
+      },
+      {
+        "start_xy_m": [
+          620.0,
+          -260.0
+        ],
+        "end_xy_m": [
+          618.7520000000002,
+          -244.4000000000001
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          618.7520000000002,
+          -244.4000000000001
+        ],
+        "end_xy_m": [
+          615.7760000000001,
+          -227.59999999999997
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          615.7760000000001,
+          -227.59999999999997
+        ],
+        "end_xy_m": [
+          612.224,
+          -209.60000000000002
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          612.224,
+          -209.60000000000002
+        ],
+        "end_xy_m": [
+          609.248,
+          -190.39999999999998
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          609.248,
+          -190.39999999999998
+        ],
+        "end_xy_m": [
+          608.0,
+          -170.0
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          620.0,
+          -200.0
+        ],
+        "end_xy_m": [
+          618.7520000000002,
+          -184.40000000000003
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          618.7520000000002,
+          -184.40000000000003
+        ],
+        "end_xy_m": [
+          615.7760000000001,
+          -167.6
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          615.7760000000001,
+          -167.6
+        ],
+        "end_xy_m": [
+          612.224,
+          -149.6
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          612.224,
+          -149.6
+        ],
+        "end_xy_m": [
+          609.248,
+          -130.4
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          609.248,
+          -130.4
+        ],
+        "end_xy_m": [
+          608.0,
+          -110.0
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          620.0,
+          -140.0
+        ],
+        "end_xy_m": [
+          618.7520000000002,
+          -124.40000000000003
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          618.7520000000002,
+          -124.40000000000003
+        ],
+        "end_xy_m": [
+          615.7760000000001,
+          -107.59999999999998
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          615.7760000000001,
+          -107.59999999999998
+        ],
+        "end_xy_m": [
+          612.224,
+          -89.6
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          612.224,
+          -89.6
+        ],
+        "end_xy_m": [
+          609.248,
+          -70.39999999999999
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          609.248,
+          -70.39999999999999
+        ],
+        "end_xy_m": [
+          608.0,
+          -50.0
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          620.0,
+          -80.0
+        ],
+        "end_xy_m": [
+          618.7520000000002,
+          -64.40000000000002
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          618.7520000000002,
+          -64.40000000000002
+        ],
+        "end_xy_m": [
+          615.7760000000001,
+          -47.599999999999994
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          615.7760000000001,
+          -47.599999999999994
+        ],
+        "end_xy_m": [
+          612.224,
+          -29.599999999999994
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          612.224,
+          -29.599999999999994
+        ],
+        "end_xy_m": [
+          609.248,
+          -10.399999999999995
+        ],
+        "width_m": 6
+      },
+      {
+        "start_xy_m": [
+          609.248,
+          -10.399999999999995
+        ],
+        "end_xy_m": [
+          608.0,
+          10.0
+        ],
+        "width_m": 6
+      }
+    ],
+    "junctions": [
+      {
+        "center_xy_m": [
+          632,
+          430
+        ],
+        "radius_m": 20
+      },
+      {
+        "center_xy_m": [
+          605,
+          392
+        ],
+        "radius_m": 26
+      },
+      {
+        "center_xy_m": [
+          938,
+          228
+        ],
+        "radius_m": 20
+      },
+      {
+        "center_xy_m": [
+          900,
+          255
+        ],
+        "radius_m": 26
+      },
+      {
+        "center_xy_m": [
+          600,
+          70
+        ],
+        "radius_m": 16
+      },
+      {
+        "center_xy_m": [
+          800,
+          260
+        ],
+        "radius_m": 16
+      }
+    ]
+  },
+  "lane_changes": [
+    {
+      "start_m": 40,
+      "end_m": 110,
+      "offset_m": -4
+    },
+    {
+      "start_m": 210,
+      "end_m": 370,
+      "offset_m": 4
+    },
+    {
+      "start_m": 560,
+      "end_m": 640,
+      "offset_m": 0
+    }
+  ],
+  "scenery": [
+    {
+      "name": "Spectator1",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        586,
+        -80,
+        -1.03
+      ],
+      "yaw": 0.0,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator2",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        584,
+        -76,
+        -1.03
+      ],
+      "yaw": 0.0,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator3",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        586,
+        -20,
+        -1.03
+      ],
+      "yaw": 3.141592653589793,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator4",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        584,
+        -16,
+        -1.03
+      ],
+      "yaw": 3.141592653589793,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator5",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        585,
+        84,
+        -1.03
+      ],
+      "yaw": 0.0,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator6",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        585,
+        88,
+        -1.03
+      ],
+      "yaw": 3.141592653589793,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator7",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        580,
+        150,
+        -1.03
+      ],
+      "yaw": 0.0,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator8",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        582,
+        154,
+        -1.03
+      ],
+      "yaw": 0.0,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator9",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        656,
+        430,
+        -1.03
+      ],
+      "yaw": 3.141592653589793,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator10",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        654,
+        434,
+        -1.03
+      ],
+      "yaw": 3.141592653589793,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator11",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        938,
+        201,
+        -1.03
+      ],
+      "yaw": 1.5707963267948966,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Spectator12",
+      "asset": "rp_carla_rigged_001_Mobile_ue4",
+      "position": [
+        942,
+        199,
+        -1.03
+      ],
+      "yaw": 1.5707963267948966,
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "OcclusionCanopyRoof",
+      "asset": "Cube",
+      "position": [
+        600,
+        -80,
+        -4.0
+      ],
+      "yaw": 0.0,
+      "scale": [
+        10,
+        10,
+        0.25
+      ]
+    },
+    {
+      "name": "OcclusionCanopyPost1",
+      "asset": "Cube",
+      "position": [
+        596,
+        -84,
+        -2.5
+      ],
+      "yaw": 0.0,
+      "scale": [
+        0.2,
+        0.2,
+        3
+      ]
+    },
+    {
+      "name": "OcclusionCanopyPost2",
+      "asset": "Cube",
+      "position": [
+        604,
+        -84,
+        -2.5
+      ],
+      "yaw": 0.0,
+      "scale": [
+        0.2,
+        0.2,
+        3
+      ]
+    },
+    {
+      "name": "OcclusionCanopyPost3",
+      "asset": "Cube",
+      "position": [
+        596,
+        -76,
+        -2.5
+      ],
+      "yaw": 0.0,
+      "scale": [
+        0.2,
+        0.2,
+        3
+      ]
+    },
+    {
+      "name": "OcclusionCanopyPost4",
+      "asset": "Cube",
+      "position": [
+        604,
+        -76,
+        -2.5
+      ],
+      "yaw": 0.0,
+      "scale": [
+        0.2,
+        0.2,
+        3
+      ]
+    }
+  ],
+  "tracking_parameters": {
+    "class_agnostic": false,
+    "ground_classes": [
+      "1",
+      "2",
+      "5",
+      "7"
+    ],
+    "ground_association": true,
+    "ground_z": 0.2,
+    "camera_pitch_deg": 22.0,
+    "camera_stabilized": true,
+    "camera_offset": [
+      0.5,
+      0.0,
+      0.2
+    ],
+    "px4_namespace": "",
+    "max_ground_range": 80.0,
+    "lost_seconds": 3.0,
+    "vehicle_reid_model": "/usr/share/target-tracker/vehicle-reid-neutron.tflite",
+    "vehicle_classes": [
+      "2",
+      "5",
+      "7"
+    ]
+  }
+}

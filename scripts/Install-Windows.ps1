@@ -3,6 +3,7 @@
 param(
     [string]$DataDirectory = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'raven-simulation'),
     [string]$Archive,
+    [switch]$ActorModels,
     [switch]$Prerequisites
 )
 $ErrorActionPreference = 'Stop'
@@ -46,3 +47,37 @@ foreach ($asset in $manifest.assets) {
     }
 }
 Write-Output "Verified scene textures: $assetDirectory"
+
+if ($ActorModels) {
+    $meshNpx = (Get-Command npx.cmd -ErrorAction Stop).Source
+    foreach ($model in $manifest.actor_models) {
+        if ([IO.Path]::GetFileName($model.file) -ne $model.file -or
+            [IO.Path]::GetFileName($model.source_directory) -ne $model.source_directory) {
+            throw 'Invalid actor model cache name'
+        }
+        $sourceDirectory = Join-Path $assetDirectory $model.source_directory
+        New-Item -ItemType Directory -Path $sourceDirectory -Force | Out-Null
+        $sourcePrefix = [IO.Path]::GetFullPath($sourceDirectory) + [IO.Path]::DirectorySeparatorChar
+        foreach ($inputAsset in $model.inputs) {
+            $sourceFile = [IO.Path]::GetFullPath((Join-Path $sourceDirectory $inputAsset.file))
+            if (-not $sourceFile.StartsWith($sourcePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                throw 'Actor source leaves the cache directory'
+            }
+            New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($sourceFile)) -Force | Out-Null
+            if (-not (Test-Path -LiteralPath $sourceFile)) {
+                Invoke-WebRequest -Uri ($model.source_url + $inputAsset.file) -OutFile $sourceFile
+            }
+            if ((Get-FileHash -LiteralPath $sourceFile -Algorithm SHA256).Hash.ToLowerInvariant() -ne $inputAsset.sha256) {
+                throw "Actor source checksum mismatch: $($inputAsset.file)"
+            }
+        }
+        $modelFile = Join-Path $assetDirectory $model.file
+        $modelArguments = @($model.arguments)
+        & $meshNpx --yes $model.generator -i (Join-Path $sourceDirectory $model.source_file) -o $modelFile @modelArguments
+        if ($LASTEXITCODE -ne 0) { throw 'Actor mesh preparation failed' }
+        if ((Get-FileHash -LiteralPath $modelFile -Algorithm SHA256).Hash.ToLowerInvariant() -ne $model.sha256) {
+            throw "Actor mesh checksum mismatch: $($model.file)"
+        }
+        Write-Output "Verified actor mesh: $($model.file)"
+    }
+}

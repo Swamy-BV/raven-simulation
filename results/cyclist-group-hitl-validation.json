@@ -1,0 +1,39 @@
+{
+  "scenario": "hitl-city-cyclist-group",
+  "controller": "i.MX95 Cortex-M7 PX4 HITL, system ID 1",
+  "companion": "i.MX95 Cortex-A55 Linux, NPU YOLOv8s, ROS 2 DDS guidance",
+  "passed": false,
+  "cyclists": 10,
+  "cars": 5,
+  "requested_following_seconds": 180,
+  "seconds_after_handover_until_hold": 24.994803579,
+  "last_selected_observation_seconds_after_handover": 21.387716695,
+  "moving_recording_seconds_before_hold": 13.003624193,
+  "formation": "Nine neighbours on translated city routes; identical cyclist assets",
+  "minimum_fixture_separation_m": 2.3,
+  "follow_distance_m": 10,
+  "identity_evaluation": {
+    "correct_observed_frames": 198,
+    "other_fixture_observed_frames": 0,
+    "ambiguous_observed_frames": 14,
+    "missing_selected_frames": 38,
+    "tracker_frames": 250,
+    "correct_fraction_of_observed": 0.9339622641509434,
+    "reference": "Recorded render-camera rays intersected with the simulated road; asynchronous fixture poses are evaluation only",
+    "uncertainty": "No confirmed switch before loss; ambiguous frames prevent claiming uninterrupted identity"
+  },
+  "normal_arming_checks": true,
+  "target_loss_hold": true,
+  "automatic_landing_passed": false,
+  "recovery": "Attitude failure during simulated landing required guarded disarm after verifying HITL and simulated-only PWM",
+  "disarmed_after_recovery": true,
+  "recording_seconds": 24.968,
+  "preview_decoded_frames": 600,
+  "preview_bytes": 2245599,
+  "scenario_checks_passed": 29,
+  "notes": [
+    "Original single-cyclist and car profiles remain unchanged.",
+    "This test changed the group fixture and framing distance, not production tracking or flight-control code.",
+    "Dense-group following is not validated; cyclist occlusion and reacquisition remain outstanding."
+  ]
+}

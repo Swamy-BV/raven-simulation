@@ -241,3 +241,28 @@ The reorganized harness also passed its on-board hover test; installation and ch
 ## License
 
 Raven simulation code is AGPL-3.0-only. ProjectAirSim's SDK and robot templates remain under their upstream MIT license. The downloaded Unreal environment and dependencies retain their own licenses; they are not redistributed here.
+
+`hitl-city-cyclist` evaluates bicycle-class following at 5.5 m/s in city traffic.
+Prepare its actor with `Install-Windows.ps1 -ActorModels` (Node.js required).
+The installer verifies source hashes and uses pinned `gltfpack` to produce a low-detail
+mesh suitable for the packaged simulator's importer. Bicycle tracks do not use car ReID.
+The model is **Cyclist On A Silver Bicycle** by restore50,
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), from
+[Sketchfab](https://sketchfab.com/3d-models/cyclist-on-a-silver-bicycle-9830d3f8cac84547aa33542c6141178c).
+Geometry is simplified; original textures are retained. Video overlays retain attribution.
+The profile uses a 40° rear-quarter formation and a 55° camera field of view.
+M7 HITL passed 180 seconds of moving-target following through the S-bends and
+roundabout exit, followed by target-loss hold, landing and disarm.
+Ground continuity supplements the existing image association; it does not provide
+bicycle ReID. See the [validation result](results/cyclist-hitl-validation.json).
+
+`hitl-city-cyclist-group` adds nine neighbours to the same scene, with a 10 m
+framing distance. The ten-cyclist test currently fails: the selected bicycle is
+lost after about 21 seconds, with no confirmed switch before loss. Simulated
+landing recovery also failed and required guarded disarm. See the
+[group result](results/cyclist-group-hitl-validation.json).
+
+The unchanged six-car/five-bridge M7 regression passed 61 seconds of moving
+following, all five occlusion recoveries, landing and disarm. Native car tracking
+also matched the pre-bicycle baseline over 1,440 updates. See the
+[car regression result](results/car-bicycle-regression.json).

@@ -32,10 +32,11 @@ cruise=3.5
 follow_seconds=61
 reticle_x=320
 reticle_y=135
+target_class=2
 require_reid=0
 require_ground=0
 if [ -n "$run_dir" ]; then
-  read -r height cruise follow_seconds reticle_x reticle_y < <(python3 - "$run_dir/config/bindings.json" <<'CONFIG'
+  read -r height cruise follow_seconds reticle_x reticle_y target_class < <(python3 - "$run_dir/config/bindings.json" <<'CONFIG'
 import json, sys
 settings = json.load(open(sys.argv[1])).get("acceptance", {})
 height = float(settings.get("height_m", 4.5))
@@ -45,7 +46,9 @@ seconds = float(settings.get("following_seconds", 61))
 assert 61 <= seconds <= 180
 reticle = settings.get("acquisition_reticle", [320, 135])
 assert len(reticle) == 2 and 0 <= reticle[0] <= 640 and 0 <= reticle[1] <= 360
-print(height, cruise, seconds, *reticle)
+target_class = int(settings.get("target_class_id", 2))
+assert 0 <= target_class < 80
+print(height, cruise, seconds, *reticle, target_class)
 CONFIG
 )
 fi
@@ -73,7 +76,7 @@ if [ -n "$run_dir" ]; then
 fi
 ssh "${args[@]}" root@"$board" 'mkdir -p /run/raven-hitl/tests; cat > /run/raven-hitl/tests/test_hitl.py' < "$root/tests/test_hitl.py"
 ssh "${args[@]}" root@"$board" 'cat > /run/raven-hitl/tests/yaw_profile.py' < "$root/tests/yaw_profile.py"
-ssh "${args[@]}" root@"$board" /bin/sh -s -- "$case_name" "$runtime" "$height" "$cruise" "$follow_seconds" "$reticle_x" "$reticle_y" "$require_reid" "$require_ground" <<'REMOTE' | mirror_output
+ssh "${args[@]}" root@"$board" /bin/sh -s -- "$case_name" "$runtime" "$height" "$cruise" "$follow_seconds" "$reticle_x" "$reticle_y" "$require_reid" "$require_ground" "$target_class" <<'REMOTE' | mirror_output
 set -e
 cd /run/raven-hitl/tests
 export ROS_LOG_DIR=/tmp/raven-hitl-log
@@ -90,5 +93,6 @@ fi
 export RAVEN_M7_HITL=1 RAVEN_HITL_HEIGHT_M="$3" RAVEN_HITL_CRUISE_MPS="$4" RAVEN_HITL_FOLLOW_SECONDS="$5"
 export RAVEN_HITL_RETICLE_X="$6" RAVEN_HITL_RETICLE_Y="$7"
 export RAVEN_HITL_REQUIRE_REID="$8" RAVEN_HITL_REQUIRE_GROUND="$9"
+export RAVEN_HITL_TARGET_CLASS="${10}"
 python3 -u -m unittest -v "test_hitl.HitlTests.test_${1}_and_land"
 REMOTE

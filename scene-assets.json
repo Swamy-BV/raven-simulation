@@ -29,5 +29,54 @@
       "source": "https://polyhaven.com/a/aerial_grass_rock",
       "license": "CC0-1.0"
     }
+  ],
+  "actor_models": [
+    {
+      "file": "cyclist-silver-demo.glb",
+      "source_directory": "silver-cyclist-source",
+      "source_file": "scene.gltf",
+      "source_url": "https://raw.githubusercontent.com/DivijShetty/Mobile-Cycle-Controller-Prototype/07f322f3877b034153d51d77c709b71ae0420d07/Assets/Imports/cyclist_on_a_silver_bicycle/",
+      "inputs": [
+        {
+          "file": "scene.gltf",
+          "sha256": "3ca7f344f3caeec0b877e85623590dcd8338d6f2a0dd8bf2c0afddcb64250bf7"
+        },
+        {
+          "file": "scene.bin",
+          "sha256": "30664d9286709c26884df23a5a075d85bbbe9a834bfb6e8ba17733a866b02243"
+        },
+        {
+          "file": "textures/Material_0_baseColor.png",
+          "sha256": "602bca34f56caf2d2e8e193248526c7d8d937fc84d25db3d565d261cac88a37e"
+        },
+        {
+          "file": "textures/Material_0_metallicRoughness.png",
+          "sha256": "81e8aa54e74d08d16c27e73f3447991dbadb87f57bd9849d805cbd7285f16315"
+        },
+        {
+          "file": "textures/Material_0_emissive.png",
+          "sha256": "d01595bf811be7999f84d06563c811ef20fbccbf3174ecaf3376b264fac9e437"
+        },
+        {
+          "file": "textures/Material_0_normal.png",
+          "sha256": "cfaee605fd0772ba5d16105f0919ccd78630c9b8c574892004c66d1d890c0407"
+        }
+      ],
+      "generator": "gltfpack@1.3.0",
+      "arguments": [
+        "-noq",
+        "-si",
+        "0.006",
+        "-sa",
+        "-sp",
+        "-sv"
+      ],
+      "sha256": "db35107706b0ca0580b59058b5f241ed72fa06e7c094ace6248136886d78c5ef",
+      "author": "restore50",
+      "title": "Cyclist On A Silver Bicycle",
+      "license": "CC-BY-4.0",
+      "source": "https://sketchfab.com/3d-models/cyclist-on-a-silver-bicycle-9830d3f8cac84547aa33542c6141178c",
+      "modifications": "Geometry simplified with gltfpack; original textures retained."
+    }
   ]
 }

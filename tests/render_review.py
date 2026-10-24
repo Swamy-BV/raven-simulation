@@ -281,10 +281,20 @@ def main():
         context.fill()
         text(context, 15, 22, "Raven | NXP i.MX95" if hardware else "Raven | Visual Tracking", size=11)
         vehicle_label = "car" if vehicle_count == 1 else "cars"
-        text(context, 208, 22, f"{vehicle_count} {vehicle_label}" if vehicle_count else "AirSim", size=9)
+        if bindings.get("acceptance", {}).get("target_class_id") == 1:
+            actors = [bindings["target"], *bindings.get("traffic", [])]
+            bicycles = sum(actor.get("asset") == "Cyclist" for actor in actors)
+            text(context, 176, 22, f"{bicycles} bikes + {vehicle_count-bicycles} cars", size=8)
+        else:
+            text(context, 208, 22, f"{vehicle_count} {vehicle_label}" if vehicle_count else "AirSim", size=9)
         details = ("PX4 M7 | Linux A55 | NPU | ROS 2 | AirSim HITL" if hardware
                    else "PX4 SITL | Linux vision | ROS 2 | AirSim")
         text(context, 15, 35, details, size=8.5)
+        if bindings.get("target", {}).get("credit"):
+            context.set_source_rgba(0, 0, 0, .62)
+            context.rectangle(8, 42, 259, 12)
+            context.fill()
+            text(context, 15, 50, bindings["target"]["credit"], size=6.5)
         state_label = state["health"].get("state", "unknown") if state else "unknown"
         if state and state["health"].get("target_control_basis") == "bounded_prediction":
             state_label = "predicting"
@@ -319,7 +329,7 @@ def main():
                 context.rectangle(x, y, box["w"], box["h"])
                 context.stroke()
                 if active:
-                    class_label = {"0": "person", "2": "car"}.get(str(box["class"]), "target")
+                    class_label = {"0": "person", "1": "bicycle", "2": "car"}.get(str(box["class"]), "target")
                     label = f"Selected {class_label}"
                     if args.telemetry:
                         label = f"{class_label.capitalize()} {aliases.get(box['id'], '--')} | det {box['score']:.0%}"

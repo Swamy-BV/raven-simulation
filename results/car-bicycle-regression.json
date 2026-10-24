@@ -1,0 +1,42 @@
+{
+  "scenario": "hitl-six-cars-shuffle-five-bridges",
+  "purpose": "Car regression after bicycle tracking and group-scene additions",
+  "controller": "i.MX95 Cortex-M7 PX4 HITL, system ID 1",
+  "passed": true,
+  "native_parity": {
+    "tracker_updates": 1440,
+    "configurations": 4,
+    "classes": [
+      2,
+      5,
+      7
+    ],
+    "matches_pre_bicycle_baseline_exactly": true,
+    "compared": "Boxes, track ID suffixes, scores, retention, recovery and rejection counters",
+    "coverage": "Ground association and class-agnostic modes, weak detections, missing embeddings and occlusions"
+  },
+  "hardware": {
+    "following_seconds": 61.0,
+    "normal_arming": true,
+    "automatic_landing": true,
+    "disarmed": true,
+    "target_loss_hold": true,
+    "recovered_observation_gaps_seconds": [
+      1.900613,
+      1.905953,
+      1.766821,
+      2.095366,
+      1.705563
+    ],
+    "behind_fraction": 1.0,
+    "bearing_error_p95_degrees": 7.5347810411818505,
+    "minimum_stand_off_m": 12.231080687697496,
+    "acceptance": {
+      "flight": true,
+      "rear_formation": true,
+      "stand_off": true,
+      "same_identity_recovered": true
+    }
+  },
+  "scope": "This car profile and acceptance criteria were unchanged; this is not a guarantee for every traffic scene."
+}

@@ -4,8 +4,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <json.hpp>
+#include <memory>
 #include <set>
 #include <stdexcept>
 #include <utility>
@@ -532,6 +534,7 @@ void ValidateScenario(const std::filesystem::path& profile,
     throw std::runtime_error(
         "Deferred target start requires HITL and a target");
   }
+  std::filesystem::create_directories(directory);
   std::set<std::string> names{
       settings.at("aircraft").at("name").get<std::string>()};
   for (const auto& actor_profile : profiles) {
@@ -548,6 +551,13 @@ void ValidateScenario(const std::filesystem::path& profile,
     }
     if (!std::isfinite(actor.at("visual_yaw_offset_deg").get<double>())) {
       throw std::runtime_error("Invalid target visual rotation");
+    }
+    if (actor.value("mesh_file", Json()).is_string()) {
+      const std::filesystem::path name =
+          actor.at("mesh_file").get<std::string>();
+      if (name != name.filename() || name.extension() != ".glb") {
+        throw std::runtime_error("Actor mesh must be a GLB filename");
+      }
     }
     Trajectory(actor_profile);
   }
@@ -617,6 +627,32 @@ ScenarioRuntime GenerateScenario(const std::filesystem::path& profile,
                                  const std::string& board,
                                  const std::string& serial_port) {
   ValidateScenario(profile, directory);
+  for (const auto& actor_profile : ActorProfiles(Read(profile))) {
+    const auto& actor = actor_profile.at("target");
+    if (actor.value("mesh_file", Json()).is_string()) {
+      const std::filesystem::path name =
+          actor.at("mesh_file").get<std::string>();
+#ifdef _WIN32
+      char* value = nullptr;
+      std::size_t length = 0;
+      if (_dupenv_s(&value, &length, "RAVEN_SIM_ASSETS") != 0) {
+        throw std::runtime_error("Cannot read scene asset environment");
+      }
+      const std::unique_ptr<char, decltype(&std::free)> storage(value,
+                                                                &std::free);
+      const auto* assets = storage.get();
+#else
+      const auto* assets = std::getenv("RAVEN_SIM_ASSETS");
+#endif
+      if (assets == nullptr) {
+        throw std::runtime_error(
+            "Set RAVEN_SIM_ASSETS for external actor meshes");
+      }
+      std::filesystem::copy_file(
+          std::filesystem::path(assets) / name, directory / name,
+          std::filesystem::copy_options::overwrite_existing);
+    }
+  }
   const auto profile_settings = Read(profile);
   if (profile_settings.contains("course") &&
       profile_settings.at("course").value("type", std::string{}) ==

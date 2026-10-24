@@ -149,7 +149,7 @@ void Client::Load(const std::filesystem::path& directory) {
       }
       actor.motion.emplace(std::move(points), trajectory.value("loop", true));
     }
-    actor.display = Spawn(actor);
+    actor.display = Spawn(actor, directory);
     actors_.push_back(std::move(actor));
   };
   const auto& target = bindings_.at("target");
@@ -205,35 +205,60 @@ Json Client::FixturePose(const DisplayActor& actor,
             {"z", std::sin(point.yaw / 2)}}}};
 }
 
-std::string Client::Spawn(const DisplayActor& actor) {
+std::string Client::SpawnAsset(const DisplayActor& actor, const Json& pose) {
   const auto& target = actor.target;
-  // ListAssets also populates the simulator's asset cache before spawning.
-  std::string asset_filter = "^";
+  // ListAssets populates the simulator asset cache before spawning.
+  std::string filter = "^";
   for (const char character : target.at("asset").get<std::string>()) {
     if (std::string("\\.^$|()[]{}*+?").find(character) != std::string::npos) {
-      asset_filter += '\\';
+      filter += '\\';
     }
-    asset_filter += character;
+    filter += character;
   }
-  asset_filter += '$';
-  const auto assets = Request("ListAssets", {{"name", asset_filter}});
+  const auto assets = Request("ListAssets", {{"name", filter + '$'}});
   if (!assets.is_array() || assets.empty()) {
     throw std::runtime_error("Scene assets are unavailable");
   }
+  return Request("SpawnObject", {{"object_name", target.at("display_name")},
+                                 {"asset_path", target.at("asset")},
+                                 {"pose", pose},
+                                 {"scale", {1, 1, 1}},
+                                 {"enable_physics", false}})
+      .get<std::string>();
+}
+
+std::string Client::SpawnMesh(const DisplayActor& actor, const Json& pose,
+                              const std::filesystem::path& directory) {
+  const auto name = actor.target.at("mesh_file").get<std::string>();
+  std::ifstream file(directory / name, std::ios::binary);
+  if (!file) {
+    throw std::runtime_error("Cannot read actor mesh: " + name);
+  }
+  const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),
+                                        std::istreambuf_iterator<char>()};
+  return Request("spawnObjectFromFile",
+                 {{"object_name", actor.target.at("display_name")},
+                  {"file_format", "glb"},
+                  {"byte_array", Json::binary(bytes)},
+                  {"is_binary", true},
+                  {"pose", pose},
+                  {"scale", {1, 1, 1}},
+                  {"enable_physics", false}})
+      .get<std::string>();
+}
+
+std::string Client::Spawn(const DisplayActor& actor,
+                          const std::filesystem::path& directory) {
   const auto pose = FixturePose(actor, actor.motion_start_ns);
-  const auto display =
-      Request("SpawnObject", {{"object_name", target.at("display_name")},
-                              {"asset_path", target.at("asset")},
-                              {"pose", pose},
-                              {"scale", {1, 1, 1}},
-                              {"enable_physics", false}})
-          .get<std::string>();
+  const auto display = actor.target.value("mesh_file", Json()).is_string()
+                           ? SpawnMesh(actor, pose, directory)
+                           : SpawnAsset(actor, pose);
   if (display.empty()) {
     throw std::runtime_error("No display target was spawned");
   }
   if (!actor.motion &&
       !Request("SetObjectScale",
-               {{"object_name", target.at("name")}, {"scale", {0, 0, 0}}})
+               {{"object_name", actor.target.at("name")}, {"scale", {0, 0, 0}}})
            .get<bool>()) {
     throw std::runtime_error("Could not hide trajectory fixture");
   }

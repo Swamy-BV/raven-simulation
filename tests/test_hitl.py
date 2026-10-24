@@ -258,7 +258,9 @@ class HitlTests(unittest.TestCase):
                 return {}
             return dict((v.key, v.value) for v in latest["health"].status[0].values)
 
-        def visible_car():
+        target_class = os.environ.get("RAVEN_HITL_TARGET_CLASS", "2")
+
+        def visible_target():
             tracks = latest.get("tracks")
             if tracks is None:
                 return None
@@ -266,16 +268,16 @@ class HitlTests(unittest.TestCase):
                 tracks.header.stamp.sec + tracks.header.stamp.nanosec / 1e9)
             if not 0 <= age < .3:
                 return None
-            cars = [d for d in tracks.detections if d.results
-                    and d.results[0].hypothesis.class_id == "2"
+            candidates = [d for d in tracks.detections if d.results
+                    and d.results[0].hypothesis.class_id == target_class
                     and d.results[0].hypothesis.score > .75
                     and 230 < d.bbox.center.position.x < 410
                     and 60 < d.bbox.center.position.y < 300]
             # Select from image geometry at the acquisition reticle. Choosing
             # the largest box can select a clipped rear escort in dense traffic.
-            return min(cars, key=lambda d: math.hypot(
+            return min(candidates, key=lambda d: math.hypot(
                 d.bbox.center.position.x - reticle_x,
-                d.bbox.center.position.y - reticle_y)) if cars else None
+                d.bbox.center.position.y - reticle_y)) if candidates else None
 
         try:
             wait(lambda: fresh() and latest["position"].xy_valid
@@ -387,8 +389,8 @@ class HitlTests(unittest.TestCase):
                 # detections before takeoff do not define the selected object.
                 self.assertTrue(service(reset, Trigger.Request()).success)
                 latest.pop("tracks", None)
-                wait(lambda: visible_car() is not None, 40, "visible NPU-tracked car")
-                selected = visible_car().id
+                wait(lambda: visible_target() is not None, 40, "visible NPU-tracked target")
+                selected = visible_target().id
                 request = SelectTarget.Request()
                 request.track_id = selected
                 reply = service(select, request)
@@ -481,7 +483,7 @@ class HitlTests(unittest.TestCase):
                       "origin_ned": origin,
                       "hover_goal_ned": [origin[0], origin[1], origin[2] - height_m],
                       "final_hold_goal_ned": goal,
-                      "selected_track": selected,
+                      "selected_track": selected, "target_class_id": target_class,
                       "following_seconds": recording_seconds if following else 0,
                       "following_ready_ros_ns": follow_ready_ros_ns,
                       "following_start_ros_ns": follow_start_ros_ns,
@@ -492,7 +494,7 @@ class HitlTests(unittest.TestCase):
         except Exception as error:
             (output / "result.json").write_text(json.dumps({
                 "passed": False, "system_id": 1, "controller": "physical Cortex-M7",
-                "selected_track": selected, "error": str(error)}, indent=2) + "\n")
+                "selected_track": selected, "target_class_id": target_class, "error": str(error)}, indent=2) + "\n")
             raise
         finally:
             if arm_requested and "status" in latest and latest["status"].arming_state == VehicleStatus.ARMING_STATE_ARMED:

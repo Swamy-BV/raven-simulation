@@ -50,7 +50,11 @@ class Client {
   Json Request(const std::string& method, const Json& parameters);
   Json Complete(sdk::TAsyncResult<sdk::Message>& result,
                 const std::string& operation);
-  std::string Spawn(const DisplayActor& actor);
+  std::string Spawn(const DisplayActor& actor,
+                    const std::filesystem::path& directory);
+  std::string SpawnAsset(const DisplayActor& actor, const Json& pose);
+  std::string SpawnMesh(const DisplayActor& actor, const Json& pose,
+                        const std::filesystem::path& directory);
   Json UpdateDisplay(DisplayActor& actor, std::int64_t time_ns,
                      std::vector<PendingUpdate>& pending);
   Json FixturePose(const DisplayActor& actor, std::int64_t time_ns);
