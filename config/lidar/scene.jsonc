@@ -1,0 +1,19 @@
+{
+  "id": "LidarBench",
+  "scene-type": "UnrealNative",
+  "actors": [
+    {
+      "type": "robot",
+      "name": "LidarDrone",
+      "origin": {"xyz": "2 -18 -3", "rpy-deg": "0 0 0"},
+      "robot-config": "robot.jsonc"
+    }
+  ],
+  "clock": {
+    "type": "real-time",
+    "step-ns": 4000000,
+    "real-time-update-rate": 4000000,
+    "pause-on-start": false
+  },
+  "home-geo-point": {"latitude": 0, "longitude": 0, "altitude": 0}
+}

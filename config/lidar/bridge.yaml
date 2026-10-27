@@ -1,0 +1,7 @@
+/**:
+  ros__parameters:
+    scene_config: scene.jsonc
+    vehicle_name: LidarDrone
+    service_root: /simulation/lidar
+    publish_tf: false
+    use_sim_time: true

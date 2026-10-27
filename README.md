@@ -38,6 +38,26 @@ To add a scenario, add a profile under `scenarios/` and select it in the bridge 
 
 This uses **IAMAI ProjectAirSim v1.0.1**, the continuation linked by Microsoft's original AirSim project. Source and environment pins are in `versions.env`. The PX4 checkout must match Raven's `px4_msgs`; do not substitute an older PX4 release to match an example.
 
+## LiDAR publishing
+
+`config/lidar/` is a stationary sensor-only scene: 16 channels, 50 m range,
+100,000 requested points/s and 10 reports/s. It has no PX4 connection or arming.
+Start the Windows simulator, then run the upstream C++ ROS 2 bridge on Linux:
+
+```bash
+ros2 run projectairsim_ros2_cpp projectairsim_ros2_cpp_node --ros-args \
+  --params-file config/lidar/bridge.yaml \
+  -p address:="$SIM_HOST" -p sim_config_path:="$PWD/config/lidar" \
+  -r /ProjectAirsim/LidarBench/robots/LidarDrone/sensors/Lidar/lidar:=/raven/vehicle_1/sensors/lidar/points
+```
+
+The output is `sensor_msgs/msg/PointCloud2`, using simulation acquisition time
+and sensor-data QoS. The sensor is aligned with the robot origin because the
+upstream bridge labels the cloud frame `LidarDrone`; XYZ is converted to ROS
+forward/left/up. This fixture publishes measurements only, without localization,
+mapping or flight control. A physical sensor will need its calibrated mounting
+transform.
+
 ## Install
 
 Windows 11, Ubuntu 22.04 in WSL 2, an NVIDIA GPU and a Raven board with ROS Jazzy, media-capture, vision-engine, target-tracker, guidance and MicroXRCEAgent are the validated arrangement. Configure SSH key access to the board first. No firmware is flashed by this repository.

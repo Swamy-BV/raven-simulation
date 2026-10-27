@@ -1,0 +1,34 @@
+{
+  "physics-type": "non-physics",
+  "links": [
+    {
+      "name": "Frame",
+      "collision": {"enabled": false},
+      "visual": {
+        "geometry": {"type": "unreal_mesh", "name": "/Drone/Quadrotor1"}
+      }
+    }
+  ],
+  "joints": [],
+  "sensors": [
+    {
+      "id": "Lidar",
+      "type": "lidar",
+      "enabled": true,
+      "parent-link": "Frame",
+      "lidar-type": "generic_cylindrical",
+      "number-of-channels": 16,
+      "range": 50,
+      "points-per-second": 100000,
+      "horizontal-rotation-frequency": 10,
+      "horizontal-fov-start-deg": 0,
+      "horizontal-fov-end-deg": 360,
+      "vertical-fov-upper-deg": 15,
+      "vertical-fov-lower-deg": -15,
+      "report-frequency": 10,
+      "disable-self-hits": true,
+      "draw-debug-points": false,
+      "origin": {"xyz": "0 0 0", "rpy-deg": "0 0 0"}
+    }
+  ]
+}
